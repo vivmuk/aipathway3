@@ -260,7 +260,7 @@ async function generateChapterContent(chapterOutline, userProfile) {
     const prompt = buildChapterPrompt(chapterOutline, userProfile);
 
     const response = await callVeniceAPI({
-        model: MODELS.CHAPTER_CONTENT,
+        model: await selectBestOutlineModel(),
         venice_parameters: {
             include_venice_system_prompt: false,
             strip_thinking_response: true,
@@ -398,7 +398,9 @@ async function callVeniceAPI(payload) {
         let errorMessage = `Venice API error: ${response.statusText}`;
         try {
             const error = await response.json();
-            errorMessage = error.error?.message || error.message || response.statusText;
+            const details = error.details || {};
+            const issues = Array.isArray(error.issues) ? error.issues.map(i => i?.message || JSON.stringify(i)).join(' | ') : '';
+            errorMessage = error.error?.message || error.message || details.message || issues || response.statusText;
             console.error('API Error Response:', error);
         } catch (e) {
             const text = await response.text();

@@ -10,12 +10,59 @@ const VENICE_API_KEY = (typeof window !== 'undefined' && window.VENICE_API_KEY)
     : 'lnWNeSg0pA_rQUooNpbfpPDBaj2vJnWol5WqKWrIEF'; // Fallback for local dev
 const VENICE_BASE_URL = 'https://api.venice.ai/api/v1';
 
-// Venice Models
+// Venice Models (defaults; outline may be auto-selected at runtime)
 const MODELS = {
-    CHAPTER_FLOW: 'zai-org-glm-4.6',                    // For overall chapter flow (updated)
-    CHAPTER_CONTENT: 'openai-gpt-oss-120b',              // For chapter content generation
-    SEARCH_SUMMARIZE: 'google-gemma-3-27b-it'            // For search and summarize
+    CHAPTER_FLOW: 'zai-org-glm-4.6',                    // Default for outline (can be overridden dynamically)
+    CHAPTER_CONTENT: 'openai-gpt-oss-120b',             // For chapter content generation
+    SEARCH_SUMMARIZE: 'google-gemma-3-27b-it'           // For search and summarize
 };
+
+// Prefer auto-selecting an outline model that supports response schemas
+let cachedOutlineModel = null;
+const OUTLINE_MODEL_PREFERENCES = [
+    'qwen3-235b',            // strong reasoning + schema support
+    'llama-3.3-70b',         // capable general model
+    'mistral-31-24b',        // vision-capable variant but often supports schema
+    'venice-uncensored'      // Venice default, supports schema per docs
+];
+
+async function selectBestOutlineModel() {
+    if (cachedOutlineModel) return cachedOutlineModel;
+    try {
+        const resp = await fetch(`${VENICE_BASE_URL}/models`, {
+            headers: {
+                'Authorization': `Bearer ${VENICE_API_KEY}`
+            }
+        });
+        if (!resp.ok) {
+            // Models endpoint is public, but if it fails, fallback to default
+            return MODELS.CHAPTER_FLOW;
+        }
+        const data = await resp.json();
+        const models = Array.isArray(data?.data) ? data.data : [];
+        // Filter models that support structured responses
+        const structured = models.filter(m => m?.model_spec?.capabilities?.supportsResponseSchema);
+        if (structured.length === 0) {
+            cachedOutlineModel = MODELS.CHAPTER_FLOW;
+            return cachedOutlineModel;
+        }
+        // Try preference ordering
+        for (const preferred of OUTLINE_MODEL_PREFERENCES) {
+            const found = structured.find(m => m.id === preferred);
+            if (found) {
+                cachedOutlineModel = found.id;
+                return cachedOutlineModel;
+            }
+        }
+        // Otherwise pick first available structured model
+        cachedOutlineModel = structured[0].id;
+        return cachedOutlineModel;
+    } catch (e) {
+        console.warn('Model listing failed, using default outline model.', e);
+        cachedOutlineModel = MODELS.CHAPTER_FLOW;
+        return cachedOutlineModel;
+    }
+}
 
 /**
  * Main function to generate complete learning journey
@@ -102,71 +149,108 @@ async function generateLearningJourney(userProfile, progressCallback) {
 async function generateCourseOutline(userProfile) {
     const prompt = buildOutlinePrompt(userProfile);
 
-    const response = await callVeniceAPI({
-        model: MODELS.CHAPTER_FLOW,
-        venice_parameters: {
-            include_venice_system_prompt: false,
-            strip_thinking_response: true,
-            disable_thinking: false
-        },
-        messages: [
-            {
-                role: 'system',
-                content: 'You are an expert AI education designer specializing in creating personalized learning journeys for women. You understand adult learning principles, the unique challenges women face in tech, and how to make AI education accessible, practical, and empowering.'
+    // First attempt: structured response (preferred)
+    try {
+        const outlineModel = await selectBestOutlineModel();
+        const response = await callVeniceAPI({
+            model: outlineModel,
+            venice_parameters: {
+                include_venice_system_prompt: false,
+                strip_thinking_response: true,
+                disable_thinking: false
             },
-            {
-                role: 'user',
-                content: prompt
-            }
-        ],
-        temperature: 0.2,
-        max_completion_tokens: 5000,
-        response_format: {
-            type: 'json_schema',
-            json_schema: {
-                name: 'course_outline',
-                strict: true,
-                schema: {
-                    type: 'object',
-                    properties: {
-                        title: { type: 'string' },
-                        subtitle: { type: 'string' },
-                        description: { type: 'string' },
-                        chapters: {
-                            type: 'array',
-                            minItems: 3,
-                            items: {
-                                type: 'object',
-                                properties: {
-                                    number: { type: 'number' },
-                                    title: { type: 'string' },
-                                    learningObjective: { type: 'string' },
-                                    estimatedMinutes: { type: 'number' }
-                                },
-                                required: ['number', 'title', 'learningObjective', 'estimatedMinutes'],
-                                additionalProperties: false
+            messages: [
+                {
+                    role: 'system',
+                    content: 'You are an expert AI education designer specializing in creating personalized learning journeys for women. You understand adult learning principles, the unique challenges women face in tech, and how to make AI education accessible, practical, and empowering.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            temperature: 0.2,
+            max_completion_tokens: 5000,
+            response_format: {
+                type: 'json_schema',
+                json_schema: {
+                    name: 'course_outline',
+                    strict: true,
+                    schema: {
+                        type: 'object',
+                        properties: {
+                            title: { type: 'string' },
+                            subtitle: { type: 'string' },
+                            description: { type: 'string' },
+                            chapters: {
+                                type: 'array',
+                                minItems: 3,
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        number: { type: ['number', 'string'] },
+                                        title: { type: 'string' },
+                                        learningObjective: { type: 'string' },
+                                        estimatedMinutes: { type: ['number', 'string', 'null'] }
+                                    },
+                                    required: ['number', 'title', 'learningObjective', 'estimatedMinutes'],
+                                    additionalProperties: false
+                                }
                             }
-                        }
-                    },
-                    required: ['title', 'subtitle', 'description', 'chapters'],
-                    additionalProperties: false
+                        },
+                        required: ['title', 'subtitle', 'description', 'chapters'],
+                        additionalProperties: false
+                    }
                 }
             }
+        });
+        const content = response.choices?.[0]?.message?.content ?? '';
+        console.debug('Raw outline response:', content);
+        const parsed = safeParseJSON(content);
+        if (parsed && Array.isArray(parsed.chapters)) {
+            if (parsed.chapters.length > 3) parsed.chapters = parsed.chapters.slice(0, 3);
+            // Normalize numbers if returned as strings
+            parsed.chapters = parsed.chapters.map((c, i) => ({
+                ...c,
+                number: typeof c.number === 'string' ? Number(c.number) || i + 1 : c.number,
+                estimatedMinutes: typeof c.estimatedMinutes === 'string' ? Number(c.estimatedMinutes) || 30 : c.estimatedMinutes ?? 30
+            }));
+            return parsed;
         }
-    });
-
-    const content = response.choices?.[0]?.message?.content ?? '';
-    // Log raw to help diagnose model output shape
-    console.debug('Raw outline response:', content);
-    const parsed = safeParseJSON(content);
-    if (!parsed || !parsed.chapters || !Array.isArray(parsed.chapters)) {
-        throw new Error('Failed to generate course outline. Please try again.');
+        throw new Error('Outline schema parsed empty.');
+    } catch (e) {
+        console.warn('Structured outline failed; falling back to unstructured parse.', e);
+        // Fallback: no response_format, just ask for JSON but be lenient
+        const response2 = await callVeniceAPI({
+            model: await selectBestOutlineModel(),
+            venice_parameters: {
+                include_venice_system_prompt: false,
+                strip_thinking_response: true
+            },
+            messages: [
+                {
+                    role: 'system',
+                    content: 'You output strictly valid JSON with no commentary.'
+                },
+                { role: 'user', content: prompt }
+            ],
+            temperature: 0.2,
+            max_completion_tokens: 5000
+        });
+        const content2 = response2.choices?.[0]?.message?.content ?? '';
+        console.debug('Raw outline response (fallback):', content2);
+        const parsed2 = safeParseJSON(content2);
+        if (!parsed2 || !Array.isArray(parsed2.chapters)) {
+            throw new Error('Failed to generate course outline. Please try again.');
+        }
+        if (parsed2.chapters.length > 3) parsed2.chapters = parsed2.chapters.slice(0, 3);
+        parsed2.chapters = parsed2.chapters.map((c, i) => ({
+            ...c,
+            number: typeof c.number === 'string' ? Number(c.number) || i + 1 : c.number,
+            estimatedMinutes: typeof c.estimatedMinutes === 'string' ? Number(c.estimatedMinutes) || 30 : c.estimatedMinutes ?? 30
+        }));
+        return parsed2;
     }
-    // Ensure we only keep first 3 chapters as preview
-    if (parsed.chapters.length > 3) {
-        parsed.chapters = parsed.chapters.slice(0, 3);
-    }
-    return parsed;
 }
 
 /**

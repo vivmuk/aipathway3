@@ -44,6 +44,11 @@ app.get('/course-viewer.html', (req, res) => {
     res.send(html);
 });
 
+// Quiet favicon 404s
+app.get('/favicon.ico', (_req, res) => {
+    res.status(204).end();
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

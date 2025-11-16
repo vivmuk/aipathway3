@@ -1,0 +1,19 @@
+{
+  "name": "women-apply-ai",
+  "version": "1.0.0",
+  "description": "AI Pathway V3 - Personalized Learning Journey",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["ai", "education", "learning"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}
+

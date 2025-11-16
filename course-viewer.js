@@ -433,59 +433,90 @@ function exportCourse() {
 function generateExportHTML() {
     const course = currentCourse;
 
-    let chaptersHTML = '';
-    course.chapters.forEach((chapter, index) => {
-        chaptersHTML += `
-            <div class="chapter" id="chapter-${index}">
-                <h2 class="chapter-number">Chapter ${chapter.number}</h2>
-                <h1 class="chapter-title">${chapter.title}</h1>
-                <p class="chapter-objective">${chapter.learningObjective}</p>
+    // Sidebar links
+    const sidebarLinks = course.chapters.map((c, i) => `
+        <a href="#" class="nav-link" data-idx="${i}" onclick="showChapter(${i}); return false;">
+            <span class="nav-num">${c.number}</span>
+            <span class="nav-title">${c.title}</span>
+        </a>
+    `).join('');
 
-                ${chapter.introduction ? `
-                    <div class="section">
-                        <h3>Introduction</h3>
-                        <p>${formatText(chapter.introduction)}</p>
+    // Learner profile view
+    const p = course.userProfile || {};
+    const profileHTML = `
+        <div class="panel">
+            <h2>Learner Profile</h2>
+            <div class="profile-grid">
+                ${[
+                    ['Primary Goal', p.primaryGoal],
+                    ['AI Experience', p.aiExperience],
+                    ['Technical Background', p.technicalBackground],
+                    ['Learning Style', p.learningStyle],
+                    ['Time Commitment', p.timeCommitment],
+                    ['Biggest Barrier', p.biggestBarrier],
+                    ['Immediate Application', p.immediateApplication],
+                    ['AI Tools Used', Array.isArray(p.aiToolsUsed) ? p.aiToolsUsed.join(', ') : (p.aiToolsUsed || '')]
+                ].map(([k,v]) => `
+                    <div class="profile-item">
+                        <div class="profile-key">${k}</div>
+                        <div class="profile-value">${v || '-'}</div>
                     </div>
-                ` : ''}
-
-                ${chapter.coreConcepts && chapter.coreConcepts.length > 0 ? `
-                    <div class="section">
-                        <h3>Core Concepts</h3>
-                        ${chapter.coreConcepts.map(c => `
-                            <div class="concept">
-                                <h4>${c.concept}</h4>
-                                <p>${c.explanation}</p>
-                                <p><strong>Example:</strong> ${c.example}</p>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-
-                ${chapter.promptingExamples && chapter.promptingExamples.length > 0 ? `
-                    <div class="section">
-                        <h3>Prompting Examples</h3>
-                        ${chapter.promptingExamples.map(p => `
-                            <div class="prompt-example">
-                                <h4>${p.title}</h4>
-                                <p>${p.explanation}</p>
-                                <pre>${escapeHtml(p.prompt)}</pre>
-                                <p><strong>Expected Output:</strong> ${p.expectedOutput}</p>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-
-                ${chapter.keyTakeaways && chapter.keyTakeaways.length > 0 ? `
-                    <div class="section">
-                        <h3>Key Takeaways</h3>
-                        <ul>
-                            ${chapter.keyTakeaways.map(t => `<li>${t}</li>`).join('')}
-                        </ul>
-                    </div>
-                ` : ''}
+                `).join('')}
             </div>
-        `;
-    });
+        </div>
+    `;
+
+    // Chapter views (one at a time)
+    const chaptersHTML = course.chapters.map((chapter, index) => `
+        <div class="chapter-view" id="view-${index}" style="display:${index===0?'block':'none'}">
+            <div class="chapter-head">
+                <div class="badge">Chapter ${chapter.number}</div>
+                <h1>${chapter.title}</h1>
+                <p class="objective">${chapter.learningObjective}</p>
+            </div>
+            ${chapter.introduction ? `
+                <div class="section">
+                    <h3>Introduction</h3>
+                    <div>${formatText(chapter.introduction)}</div>
+                </div>
+            ` : ''}
+            ${chapter.coreConcepts && chapter.coreConcepts.length ? `
+                <div class="section">
+                    <h3>Core Concepts</h3>
+                    ${chapter.coreConcepts.map(c => `
+                        <div class="concept">
+                            <h4>${c.concept}</h4>
+                            <p>${c.explanation}</p>
+                            <p><strong>Example:</strong> ${c.example}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+            ${chapter.promptingExamples && chapter.promptingExamples.length ? `
+                <div class="section">
+                    <h3>Prompting Examples</h3>
+                    ${chapter.promptingExamples.map(p => `
+                        <div class="prompt-example">
+                            <h4>${p.title}</h4>
+                            <p>${p.explanation}</p>
+                            <pre>${escapeHtml(p.prompt)}</pre>
+                            <p><strong>Expected Output:</strong> ${p.expectedOutput}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+            ${chapter.keyTakeaways && chapter.keyTakeaways.length ? `
+                <div class="section">
+                    <h3>Key Takeaways</h3>
+                    <ul>${chapter.keyTakeaways.map(t => `<li>${t}</li>`).join('')}</ul>
+                </div>
+            ` : ''}
+            <div class="pager">
+                <button onclick="prevChapter()" ${index===0?'disabled':''}>Previous</button>
+                <button onclick="nextChapter()" ${index===course.chapters.length-1?'disabled':''}>Next</button>
+            </div>
+        </div>
+    `).join('');
 
     return `
 <!DOCTYPE html>
@@ -496,67 +527,87 @@ function generateExportHTML() {
     <title>${course.title}</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Montserrat', sans-serif;
-            line-height: 1.6;
-            color: #1F2937;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 2rem;
-            background: #F9FAFB;
-        }
-        h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; color: #8B5CF6; }
-        h2 { font-size: 2rem; font-weight: 700; margin: 2rem 0 1rem; color: #7C3AED; }
-        h3 { font-size: 1.5rem; font-weight: 600; margin: 1.5rem 0 1rem; color: #374151; }
-        h4 { font-size: 1.25rem; font-weight: 600; margin: 1rem 0 0.5rem; color: #4B5563; }
-        p { margin-bottom: 1rem; }
-        .chapter {
-            background: white;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            border-radius: 1rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .chapter-number {
-            display: inline-block;
-            background: linear-gradient(135deg, #8B5CF6, #EC4899);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 999px;
-            font-size: 1rem;
-            margin-bottom: 1rem;
-        }
-        .section { margin: 2rem 0; }
-        pre {
-            background: #1F2937;
-            color: #E5E7EB;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            overflow-x: auto;
-            margin: 1rem 0;
-        }
-        ul { margin-left: 2rem; margin-bottom: 1rem; }
-        li { margin-bottom: 0.5rem; }
-        .concept, .prompt-example {
-            background: #F3F4F6;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            margin-bottom: 1rem;
-        }
-        @media print {
-            .chapter { page-break-after: always; }
-        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Montserrat',sans-serif;line-height:1.6;color:#1F2937;background:#F9FAFB}
+        .layout{display:grid;grid-template-columns:280px 1fr;gap:24px;max-width:1200px;margin:0 auto;padding:24px}
+        .sidebar{position:sticky;top:24px;align-self:start;background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:16px}
+        .title{font-size:24px;font-weight:800;background:linear-gradient(135deg,#8B5CF6,#EC4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
+        .subtitle{color:#6B7280;margin-bottom:16px}
+        .tabs{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+        .tab{padding:8px 12px;border-radius:999px;border:1px solid #E5E7EB;background:#fff;color:#374151;font-weight:600;cursor:pointer}
+        .tab.active{background:linear-gradient(135deg,rgba(139,92,246,.1),rgba(236,72,153,.1));border-color:#C7D2FE;color:#4F46E5}
+        .nav{display:flex;flex-direction:column;gap:6px}
+        .nav-link{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:8px;color:#374151;text-decoration:none;border:1px solid transparent}
+        .nav-link:hover{background:#F3F4F6}
+        .nav-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#E5E7EB;font-size:12px;font-weight:700}
+        .nav-title{flex:1}
+        .content{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:20px;min-height:60vh}
+        .chapter-head .badge{display:inline-block;padding:4px 10px;border-radius:999px;background:linear-gradient(135deg,#8B5CF6,#EC4899);color:#fff;font-weight:700;margin-bottom:8px}
+        .chapter-head h1{font-size:26px;margin-bottom:6px}
+        .objective{color:#6B7280;margin-bottom:14px}
+        .section{margin:16px 0}
+        pre{background:#111827;color:#E5E7EB;padding:12px;border-radius:8px;overflow-x:auto}
+        .concept,.prompt-example{background:#F3F4F6;padding:12px;border-radius:8px;margin:10px 0}
+        .pager{display:flex;justify-content:space-between;gap:8px;margin-top:12px}
+        .pager button{padding:8px 12px;border-radius:8px;border:1px solid #E5E7EB;background:#fff;cursor:pointer;font-weight:600}
+        .panel{background:#F9FAFB;border:1px dashed #E5E7EB;border-radius:12px;padding:16px}
+        .profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px}
+        .profile-item{background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:10px}
+        .profile-key{font-weight:700;font-size:12px;color:#6B7280;margin-bottom:4px}
+        .profile-value{color:#111827}
+        @media (max-width: 900px){.layout{grid-template-columns:1fr}.sidebar{position:static}}
     </style>
 </head>
 <body>
-    <h1>${course.title}</h1>
-    <p style="font-size: 1.25rem; color: #6B7280; margin-bottom: 2rem;">${course.subtitle}</p>
-    ${chaptersHTML}
-    <footer style="text-align: center; margin-top: 3rem; color: #9CA3AF;">
-        <p>Generated by AI Pathway V3 &copy; 2025</p>
-        <p>Your personalized AI learning journey</p>
-    </footer>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="title">${course.title}</div>
+            <div class="subtitle">${course.subtitle}</div>
+            <div class="tabs">
+                <button class="tab active" id="tab-chapters" onclick="switchView('chapters')">Chapters</button>
+                <button class="tab" id="tab-profile" onclick="switchView('profile')">Learner Profile</button>
+            </div>
+            <nav class="nav" id="nav-chapters">
+                ${sidebarLinks}
+            </nav>
+        </aside>
+        <main class="content">
+            <div id="profile-view" style="display:none">
+                ${profileHTML}
+            </div>
+            <div id="chapters-view">
+                ${chaptersHTML}
+            </div>
+        </main>
+    </div>
+    <script>
+        let currentIndex = 0;
+        function showChapter(i){
+            currentIndex = i;
+            document.querySelectorAll('.chapter-view').forEach((el,idx)=>{
+                el.style.display = idx===i ? 'block' : 'none';
+            });
+            document.querySelectorAll('.nav-link').forEach((a,idx)=>{
+                a.style.background = idx===i ? 'rgba(139,92,246,0.08)' : '';
+                a.style.borderColor = idx===i ? '#C7D2FE' : 'transparent';
+            });
+        }
+        function nextChapter(){
+            const total = ${course.chapters.length};
+            if(currentIndex < total-1){ showChapter(currentIndex+1); }
+        }
+        function prevChapter(){
+            if(currentIndex > 0){ showChapter(currentIndex-1); }
+        }
+        function switchView(view){
+            const tabs = {chapters: document.getElementById('tab-chapters'), profile: document.getElementById('tab-profile')};
+            const panes = {chapters: document.getElementById('chapters-view'), profile: document.getElementById('profile-view')};
+            Object.keys(tabs).forEach(k=>tabs[k].classList.remove('active'));
+            Object.keys(panes).forEach(k=>panes[k].style.display='none');
+            tabs[view].classList.add('active');
+            panes[view].style.display = 'block';
+        }
+    </script>
 </body>
 </html>
     `;

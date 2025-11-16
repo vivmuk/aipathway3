@@ -286,7 +286,8 @@ async function generateCourse() {
     } catch (error) {
         console.error('Error generating course:', error);
         stopTipRotation();
-        alert('Sorry, there was an error generating your course. Please try again.');
+        const errorMessage = error.message || 'Unknown error occurred';
+        alert(`Sorry, there was an error generating your course:\n\n${errorMessage}\n\nPlease check the console for more details and try again.`);
         showSection('assessment-screen');
     }
 }

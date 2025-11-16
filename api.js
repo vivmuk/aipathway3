@@ -87,6 +87,11 @@ async function generateLearningJourney(userProfile, progressCallback) {
 
     } catch (error) {
         console.error('Error generating learning journey:', error);
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
         throw error;
     }
 }
@@ -146,7 +151,13 @@ async function generateCourseOutline(userProfile) {
         }
     });
 
-    return JSON.parse(response.choices[0].message.content);
+    const content = response.choices[0].message.content;
+    try {
+        return JSON.parse(content);
+    } catch (parseError) {
+        console.error('Failed to parse JSON response:', content);
+        throw new Error(`Failed to parse API response: ${parseError.message}. Response: ${content.substring(0, 200)}...`);
+    }
 }
 
 /**
@@ -179,7 +190,14 @@ async function generateChapterContent(chapterOutline, userProfile) {
         }
     });
 
-    const content = JSON.parse(response.choices[0].message.content);
+    const contentText = response.choices[0].message.content;
+    let content;
+    try {
+        content = JSON.parse(contentText);
+    } catch (parseError) {
+        console.error('Failed to parse chapter content JSON:', contentText);
+        throw new Error(`Failed to parse chapter content: ${parseError.message}. Response: ${contentText.substring(0, 200)}...`);
+    }
 
     return {
         ...chapterOutline,
@@ -240,8 +258,17 @@ async function callVeniceAPI(payload) {
     });
 
     if (!response.ok) {
-        const error = await response.json();
-        throw new Error(`Venice API error: ${error.error?.message || response.statusText}`);
+        let errorMessage = `Venice API error: ${response.statusText}`;
+        try {
+            const error = await response.json();
+            errorMessage = error.error?.message || error.message || response.statusText;
+            console.error('API Error Response:', error);
+        } catch (e) {
+            const text = await response.text();
+            console.error('API Error Text:', text);
+            errorMessage = text || response.statusText;
+        }
+        throw new Error(`Venice API error (${response.status}): ${errorMessage}`);
     }
 
     return await response.json();

@@ -104,6 +104,11 @@ async function generateCourseOutline(userProfile) {
 
     const response = await callVeniceAPI({
         model: MODELS.CHAPTER_FLOW,
+        venice_parameters: {
+            include_venice_system_prompt: false,
+            strip_thinking_response: true,
+            disable_thinking: false
+        },
         messages: [
             {
                 role: 'system',
@@ -114,7 +119,7 @@ async function generateCourseOutline(userProfile) {
                 content: prompt
             }
         ],
-        temperature: 0.7,
+        temperature: 0.3,
         max_completion_tokens: 5000,
         response_format: {
             type: 'json_schema',
@@ -155,7 +160,7 @@ async function generateCourseOutline(userProfile) {
     try {
         return JSON.parse(content);
     } catch (parseError) {
-        console.error('Failed to parse JSON response:', content);
+        console.error('Failed to parse JSON response (outline):', content);
         throw new Error(`Failed to parse API response: ${parseError.message}. Response: ${content.substring(0, 200)}...`);
     }
 }
@@ -168,6 +173,11 @@ async function generateChapterContent(chapterOutline, userProfile) {
 
     const response = await callVeniceAPI({
         model: MODELS.CHAPTER_CONTENT,
+        venice_parameters: {
+            include_venice_system_prompt: false,
+            strip_thinking_response: true,
+            disable_thinking: false
+        },
         messages: [
             {
                 role: 'system',
@@ -178,7 +188,7 @@ async function generateChapterContent(chapterOutline, userProfile) {
                 content: prompt
             }
         ],
-        temperature: 0.7,
+        temperature: 0.35,
         max_completion_tokens: 8000,
         response_format: {
             type: 'json_schema',

@@ -12,7 +12,7 @@ const VENICE_BASE_URL = 'https://api.venice.ai/api/v1';
 
 // Venice Models
 const MODELS = {
-    CHAPTER_FLOW: 'qwen3-235b-a22b-thinking-2507',      // For overall chapter flow
+    CHAPTER_FLOW: 'zai-org-glm-4.6',                    // For overall chapter flow (updated)
     CHAPTER_CONTENT: 'openai-gpt-oss-120b',              // For chapter content generation
     SEARCH_SUMMARIZE: 'google-gemma-3-27b-it'            // For search and summarize
 };
@@ -119,7 +119,7 @@ async function generateCourseOutline(userProfile) {
                 content: prompt
             }
         ],
-        temperature: 0.3,
+        temperature: 0.2,
         max_completion_tokens: 5000,
         response_format: {
             type: 'json_schema',
@@ -135,7 +135,6 @@ async function generateCourseOutline(userProfile) {
                         chapters: {
                             type: 'array',
                             minItems: 3,
-                            maxItems: 3,
                             items: {
                                 type: 'object',
                                 properties: {
@@ -156,13 +155,18 @@ async function generateCourseOutline(userProfile) {
         }
     });
 
-    const content = response.choices[0].message.content;
-    try {
-        return JSON.parse(content);
-    } catch (parseError) {
-        console.error('Failed to parse JSON response (outline):', content);
-        throw new Error(`Failed to parse API response: ${parseError.message}. Response: ${content.substring(0, 200)}...`);
+    const content = response.choices?.[0]?.message?.content ?? '';
+    // Log raw to help diagnose model output shape
+    console.debug('Raw outline response:', content);
+    const parsed = safeParseJSON(content);
+    if (!parsed || !parsed.chapters || !Array.isArray(parsed.chapters)) {
+        throw new Error('Failed to generate course outline. Please try again.');
     }
+    // Ensure we only keep first 3 chapters as preview
+    if (parsed.chapters.length > 3) {
+        parsed.chapters = parsed.chapters.slice(0, 3);
+    }
+    return parsed;
 }
 
 /**
@@ -188,7 +192,7 @@ async function generateChapterContent(chapterOutline, userProfile) {
                 content: prompt
             }
         ],
-        temperature: 0.35,
+        temperature: 0.25,
         max_completion_tokens: 8000,
         response_format: {
             type: 'json_schema',
@@ -213,6 +217,45 @@ async function generateChapterContent(chapterOutline, userProfile) {
         ...chapterOutline,
         ...content
     };
+}
+
+/**
+ * Try to parse JSON robustly by extracting the first valid JSON object if needed
+ */
+function safeParseJSON(text) {
+    if (!text || typeof text !== 'string') return null;
+    // Fast path
+    try {
+        return JSON.parse(text);
+    } catch (_) {}
+    // Extract from code fences ```json ... ```
+    const fenceMatch = text.match(/```json\s*([\s\S]*?)```/i) || text.match(/```\s*([\s\S]*?)```/i);
+    if (fenceMatch && fenceMatch[1]) {
+        try {
+            return JSON.parse(fenceMatch[1].trim());
+        } catch (_) {}
+    }
+    // Extract first {...} balanced block
+    const start = text.indexOf('{');
+    if (start >= 0) {
+        let depth = 0;
+        for (let i = start; i < text.length; i++) {
+            const ch = text[i];
+            if (ch === '{') depth++;
+            else if (ch === '}') {
+                depth--;
+                if (depth === 0) {
+                    const candidate = text.slice(start, i + 1);
+                    try {
+                        return JSON.parse(candidate);
+                    } catch (_) {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    return null;
 }
 
 /**

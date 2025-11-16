@@ -12,12 +12,103 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('AI Pathway V3 initialized');
 });
 
+// Prefilled personas (industry agnostic)
+const PREFILLED_PERSONAS = {
+    beginner_fast_start: {
+        primaryGoal: 'get_results_now',
+        aiExperience: 'complete_beginner',
+        industry: 'general',
+        specificChallenge: 'use_ai_for_daily_tasks',
+        aiToolsUsed: [],
+        learningStyle: 'guided',
+        timeCommitment: '1-2 hours per week',
+        technicalBackground: 'no_coding',
+        biggestBarrier: 'too_technical',
+        immediateApplication: 'personal_productivity',
+        aiMindset: 'exploring',
+        supportNeeds: ['templates', 'examples'],
+        timestamp: new Date().toISOString()
+    },
+    pro_workflows_10x: {
+        primaryGoal: 'workflow_automation',
+        aiExperience: 'some_experience',
+        industry: 'general',
+        specificChallenge: 'save_time_and_reduce_rework',
+        aiToolsUsed: ['ChatGPT', 'Google Gemini'],
+        learningStyle: 'project_based',
+        timeCommitment: '2-3 hours per week',
+        technicalBackground: 'no_coding',
+        biggestBarrier: 'no_time',
+        immediateApplication: 'create_reusable_prompts_and_SOPs',
+        aiMindset: 'pragmatic',
+        supportNeeds: ['checklists', 'prompt_libraries'],
+        timestamp: new Date().toISOString()
+    },
+    leader_enablement: {
+        primaryGoal: 'team_enablement',
+        aiExperience: 'beginner',
+        industry: 'general',
+        specificChallenge: 'planning_prioritization_comms',
+        aiToolsUsed: ['ChatGPT'],
+        learningStyle: 'mixed',
+        timeCommitment: '1-2 hours per week',
+        technicalBackground: 'no_coding',
+        biggestBarrier: 'unsure_best_practices',
+        immediateApplication: 'planning_and_communications',
+        aiMindset: 'strategic',
+        supportNeeds: ['examples', 'frameworks'],
+        timestamp: new Date().toISOString()
+    },
+    creator_builder: {
+        primaryGoal: 'create_and_ship',
+        aiExperience: 'intermediate',
+        industry: 'general',
+        specificChallenge: 'content_assets_and_light_tools',
+        aiToolsUsed: ['ChatGPT', 'Canva', 'Notion'],
+        learningStyle: 'hands_on',
+        timeCommitment: '3-5 hours per week',
+        technicalBackground: 'some_coding',
+        biggestBarrier: 'from_idea_to_output',
+        immediateApplication: 'rapid_content_and_prototypes',
+        aiMindset: 'experimental',
+        supportNeeds: ['examples', 'step_by_step'],
+        timestamp: new Date().toISOString()
+    }
+};
+
 // Start the assessment
 function startAssessment() {
     showSection('assessment-screen');
     currentQuestionIndex = 0;
     userAnswers = {};
     renderQuestion();
+}
+
+// Start directly from a persona (skip quiz)
+async function startPersona(personaId) {
+    const persona = PREFILLED_PERSONAS[personaId];
+    if (!persona) {
+        alert('Sorry, that persona is not available.');
+        return;
+    }
+
+    showSection('loading-screen');
+    startTipRotation();
+    chapterTrackingInitialized = false;
+
+    try {
+        const course = await generateLearningJourney(persona, updateLoadingProgress);
+        stopTipRotation();
+        localStorage.setItem('aiPathwayV3_course', JSON.stringify(course));
+        localStorage.setItem('aiPathwayV3_profile', JSON.stringify(persona));
+        window.location.href = 'course-viewer.html';
+    } catch (error) {
+        console.error('Error generating course from persona:', error);
+        stopTipRotation();
+        const errorMessage = error.message || 'Unknown error occurred';
+        alert(`Sorry, there was an error generating your course:\n\n${errorMessage}\n\nPlease check the console for more details and try again.`);
+        showSection('welcome-screen');
+    }
 }
 
 // Show specific section

@@ -3,8 +3,11 @@
 // Handles all Venice AI API calls
 // ====================================
 
-// IMPORTANT: Replace with your Venice API key
-const VENICE_API_KEY = 'lnWNeSg0pA_rQUooNpbfpPDBaj2vJnWol5WqKWrIEF';
+// Get API key from window (injected by server) or use fallback
+// In Railway, set VENICE_API_KEY environment variable
+const VENICE_API_KEY = (typeof window !== 'undefined' && window.VENICE_API_KEY) 
+    ? window.VENICE_API_KEY 
+    : 'lnWNeSg0pA_rQUooNpbfpPDBaj2vJnWol5WqKWrIEF'; // Fallback for local dev
 const VENICE_BASE_URL = 'https://api.venice.ai/api/v1';
 
 // Venice Models

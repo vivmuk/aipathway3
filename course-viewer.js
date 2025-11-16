@@ -499,10 +499,64 @@ function generateExportHTML() {
                         <div class="prompt-example">
                             <h4>${p.title}</h4>
                             <p>${p.explanation}</p>
-                            <pre>${escapeHtml(p.prompt)}</pre>
+                            <pre class="code">${escapeHtml(p.prompt)}</pre>
                             <p><strong>Expected Output:</strong> ${p.expectedOutput}</p>
                         </div>
                     `).join('')}
+                </div>
+            ` : ''}
+            ${chapter.agentPromptExamples && chapter.agentPromptExamples.length ? `
+                <div class="section">
+                    <h3>Agent Prompt Examples</h3>
+                    ${chapter.agentPromptExamples.map(a => `
+                        <div class="agent">
+                            <h4>${a.title}</h4>
+                            <div class="agent-row"><span class="k">Scenario</span><span class="v">${a.scenario || '-'}</span></div>
+                            <div class="agent-row"><span class="k">Agent Role</span><span class="v">${a.agentRole || '-'}</span></div>
+                            <div class="agent-row"><span class="k">Instructions</span></div>
+                            <pre class="code">${escapeHtml(a.agentInstructions || '')}</pre>
+                            <div class="agent-row"><span class="k">Expected Behavior</span><span class="v">${a.expectedBehavior || '-'}</span></div>
+                            ${a.useCase ? `<div class="agent-row"><span class="k">Use Case</span><span class="v">${a.useCase}</span></div>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+            ${chapter.tryItYourself && chapter.tryItYourself.length ? `
+                <div class="section">
+                    <h3>Try It Yourself</h3>
+                    ${chapter.tryItYourself.map(t => `
+                        <div class="exercise">
+                            <div class="exercise-head">
+                                <h4>${t.title}</h4>
+                                <span class="badge ${t.difficulty || 'beginner'}">${t.difficulty || ''}</span>
+                            </div>
+                            <p>${t.instructions || ''}</p>
+                            <p><strong>Expected Outcome:</strong> ${t.expectedOutcome || ''}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+            ${chapter.aiMindsetReflection ? `
+                <div class="section">
+                    <h3>AI Mindset Reflection</h3>
+                    <div class="reflection">
+                        <div class="reflection-row"><span class="k">Question</span><span class="v">${chapter.aiMindsetReflection.question || '-'}</span></div>
+                        <div class="reflection-row"><span class="k">Confidence Tip</span><span class="v">${chapter.aiMindsetReflection.confidenceTip || '-'}</span></div>
+                        ${chapter.aiMindsetReflection.ethicalConsideration ? `<div class="reflection-row"><span class="k">Ethical Consideration</span><span class="v">${chapter.aiMindsetReflection.ethicalConsideration}</span></div>` : ''}
+                    </div>
+                </div>
+            ` : ''}
+            ${chapter.latestUpdates && chapter.latestUpdates.length ? `
+                <div class="section">
+                    <h3>Latest Insights & Updates</h3>
+                    <div class="updates">
+                        ${chapter.latestUpdates.map(u => `
+                            <div class="update">
+                                <div class="u-title">${u.title}</div>
+                                <div class="u-summary">${u.summary}</div>
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
             ` : ''}
             ${chapter.keyTakeaways && chapter.keyTakeaways.length ? `
@@ -528,33 +582,42 @@ function generateExportHTML() {
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Montserrat',sans-serif;line-height:1.6;color:#1F2937;background:#F9FAFB}
-        .layout{display:grid;grid-template-columns:280px 1fr;gap:24px;max-width:1200px;margin:0 auto;padding:24px}
-        .sidebar{position:sticky;top:24px;align-self:start;background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:16px}
-        .title{font-size:24px;font-weight:800;background:linear-gradient(135deg,#8B5CF6,#EC4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
-        .subtitle{color:#6B7280;margin-bottom:16px}
+        body{font-family:'Montserrat',sans-serif;line-height:1.6;color:#E5E7EB;background:#0F172A}
+        .layout{display:grid;grid-template-columns:300px 1fr;gap:24px;max-width:1200px;margin:0 auto;padding:24px}
+        .sidebar{position:sticky;top:24px;align-self:start;background:#111827;border:1px solid #1F2937;border-radius:12px;padding:16px}
+        .title{font-size:24px;font-weight:800;background:linear-gradient(135deg,#60A5FA,#F472B6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
+        .subtitle{color:#9CA3AF;margin-bottom:16px}
         .tabs{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-        .tab{padding:8px 12px;border-radius:999px;border:1px solid #E5E7EB;background:#fff;color:#374151;font-weight:600;cursor:pointer}
-        .tab.active{background:linear-gradient(135deg,rgba(139,92,246,.1),rgba(236,72,153,.1));border-color:#C7D2FE;color:#4F46E5}
+        .tab{padding:8px 12px;border-radius:999px;border:1px solid #1F2937;background:#0B1220;color:#CBD5E1;font-weight:600;cursor:pointer}
+        .tab.active{background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(236,72,153,.15));border-color:#334155;color:#93C5FD}
         .nav{display:flex;flex-direction:column;gap:6px}
-        .nav-link{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:8px;color:#374151;text-decoration:none;border:1px solid transparent}
-        .nav-link:hover{background:#F3F4F6}
-        .nav-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#E5E7EB;font-size:12px;font-weight:700}
+        .nav-link{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:8px;color:#E5E7EB;text-decoration:none;border:1px solid #0B1220;background:#0B1220}
+        .nav-link:hover{background:#0B1528;border-color:#1F2937}
+        .nav-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#1F2937;font-size:12px;font-weight:700}
         .nav-title{flex:1}
-        .content{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:20px;min-height:60vh}
-        .chapter-head .badge{display:inline-block;padding:4px 10px;border-radius:999px;background:linear-gradient(135deg,#8B5CF6,#EC4899);color:#fff;font-weight:700;margin-bottom:8px}
-        .chapter-head h1{font-size:26px;margin-bottom:6px}
-        .objective{color:#6B7280;margin-bottom:14px}
-        .section{margin:16px 0}
-        pre{background:#111827;color:#E5E7EB;padding:12px;border-radius:8px;overflow-x:auto}
-        .concept,.prompt-example{background:#F3F4F6;padding:12px;border-radius:8px;margin:10px 0}
+        .content{background:#0B1220;border:1px solid #1F2937;border-radius:12px;padding:20px;min-height:60vh}
+        .chapter-head .badge{display:inline-block;padding:4px 10px;border-radius:999px;background:linear-gradient(135deg,#60A5FA,#F472B6);color:#0B1220;font-weight:800;margin-bottom:8px}
+        .chapter-head h1{font-size:26px;margin-bottom:6px;color:#E5E7EB}
+        .objective{color:#94A3B8;margin-bottom:14px}
+        .section{margin:20px 0}
+        pre.code{background:#0A0F1A;color:#E5E7EB;padding:12px;border-radius:8px;overflow-x:auto;white-space:pre-wrap;word-break:break-word;border:1px solid #1F2937}
+        .concept,.prompt-example,.agent,.exercise,.update,.panel,.reflection{background:#0F172A;padding:12px;border-radius:8px;margin:10px 0;border:1px solid #1F2937}
+        .agent-row,.reflection-row{display:flex;gap:12px;margin:6px 0}
+        .k{min-width:160px;color:#93C5FD;font-weight:700}
+        .v{color:#E5E7EB}
+        .updates{display:grid;gap:10px}
+        .u-title{font-weight:700;color:#EAB308}
         .pager{display:flex;justify-content:space-between;gap:8px;margin-top:12px}
-        .pager button{padding:8px 12px;border-radius:8px;border:1px solid #E5E7EB;background:#fff;cursor:pointer;font-weight:600}
-        .panel{background:#F9FAFB;border:1px dashed #E5E7EB;border-radius:12px;padding:16px}
+        .pager button{padding:8px 12px;border-radius:8px;border:1px solid #1F2937;background:#0B1528;color:#E5E7EB;cursor:pointer;font-weight:600}
+        .pager button[disabled]{opacity:.5;cursor:not-allowed}
+        .panel{border-style:dashed}
         .profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px}
-        .profile-item{background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:10px}
-        .profile-key{font-weight:700;font-size:12px;color:#6B7280;margin-bottom:4px}
-        .profile-value{color:#111827}
+        .profile-item{background:#0B1528;border:1px solid #1F2937;border-radius:8px;padding:10px}
+        .profile-key{font-weight:700;font-size:12px;color:#93C5FD;margin-bottom:4px}
+        .profile-value{color:#E5E7EB}
+        .badge.beginner{background:#064E3B;color:#A7F3D0;border:1px solid #065F46}
+        .badge.intermediate{background:#78350F;color:#FDE68A;border:1px solid #92400E}
+        .badge.advanced{background:#7F1D1D;color:#FCA5A5;border:1px solid #991B1B}
         @media (max-width: 900px){.layout{grid-template-columns:1fr}.sidebar{position:static}}
     </style>
 </head>

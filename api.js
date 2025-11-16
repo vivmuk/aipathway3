@@ -3,6 +3,9 @@
 // Handles all Venice AI API calls
 // ====================================
 
+// Number of chapters to generate
+const NUM_CHAPTERS = 10;
+
 // Get API key from window (injected by server) or use fallback
 // In Railway, set VENICE_API_KEY environment variable
 const VENICE_API_KEY = (typeof window !== 'undefined' && window.VENICE_API_KEY) 
@@ -184,7 +187,7 @@ async function generateCourseOutline(userProfile) {
                             description: { type: 'string' },
                             chapters: {
                                 type: 'array',
-                                minItems: 3,
+                            minItems: NUM_CHAPTERS,
                                 items: {
                                     type: 'object',
                                     properties: {
@@ -208,7 +211,6 @@ async function generateCourseOutline(userProfile) {
         console.debug('Raw outline response:', content);
         const parsed = safeParseJSON(content);
         if (parsed && Array.isArray(parsed.chapters)) {
-            if (parsed.chapters.length > 3) parsed.chapters = parsed.chapters.slice(0, 3);
             // Normalize numbers if returned as strings
             parsed.chapters = parsed.chapters.map((c, i) => ({
                 ...c,
@@ -243,7 +245,6 @@ async function generateCourseOutline(userProfile) {
         if (!parsed2 || !Array.isArray(parsed2.chapters)) {
             throw new Error('Failed to generate course outline. Please try again.');
         }
-        if (parsed2.chapters.length > 3) parsed2.chapters = parsed2.chapters.slice(0, 3);
         parsed2.chapters = parsed2.chapters.map((c, i) => ({
             ...c,
             number: typeof c.number === 'string' ? Number(c.number) || i + 1 : c.number,
@@ -423,7 +424,7 @@ function buildOutlinePrompt(userProfile) {
     const supportNeeds = Array.isArray(userProfile.supportNeeds) && userProfile.supportNeeds.length > 0
         ? userProfile.supportNeeds.join(', ') : 'general guidance';
 
-    return `Create a personalized 3-chapter Generative AI learning journey ${industryContext}.
+    return `Create a personalized ${NUM_CHAPTERS}-chapter Generative AI learning journey ${industryContext}.
 
 **Learner Profile:**
 - Primary Goal: ${userProfile.primaryGoal}
@@ -440,7 +441,7 @@ function buildOutlinePrompt(userProfile) {
 - Support Needs: ${supportNeeds}
 
 **Requirements:**
-1. Create exactly 3 progressive chapters (this is a test/preview)
+1. Create exactly ${NUM_CHAPTERS} progressive chapters
 2. Each chapter should build on the previous one
 3. Focus heavily on PRACTICAL APPLICATION with real prompting examples
 4. Address their specific challenge: ${userProfile.specificChallenge || 'general productivity'}
@@ -456,7 +457,7 @@ function buildOutlinePrompt(userProfile) {
 Generate a course outline with:
 - Engaging course title and subtitle
 - Brief description (2-3 sentences)
-- 3 chapters with titles, learning objectives, and estimated time (in minutes)`;
+- ${NUM_CHAPTERS} chapters with titles, learning objectives, and estimated time (in minutes)`;
 }
 
 /**

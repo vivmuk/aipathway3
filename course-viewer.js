@@ -433,144 +433,152 @@ function exportCourse() {
 function generateExportHTML() {
     const course = currentCourse;
 
-    // Sidebar links
-    const sidebarLinks = course.chapters.map((c, i) => `
-        <a href="#" class="nav-link" data-idx="${i}" onclick="showChapter(${i}); return false;">
-            <span class="nav-num">${c.number}</span>
-            <span class="nav-title">${c.title}</span>
-        </a>
+    // Table of contents
+    const tocHTML = course.chapters.map((c, i) => `
+        <div class="toc-item">
+            <span class="toc-number">${c.number}</span>
+            <span class="toc-title-text">${escapeHtml(c.title)}</span>
+        </div>
     `).join('');
 
-    // Learner profile view
+    // Learner profile summary
     const p = course.userProfile || {};
-    const profileHTML = `
-        <div class="panel">
-            <h2>Learner Profile</h2>
-            <div class="profile-grid">
+    const profileSummary = `
+        <div class="profile-summary">
+            <h3>Learner Profile</h3>
+            <div class="profile-details">
                 ${[
                     ['Primary Goal', p.primaryGoal],
                     ['AI Experience', p.aiExperience],
+                    ['Industry', p.industry || 'General'],
                     ['Technical Background', p.technicalBackground],
-                    ['Learning Style', p.learningStyle],
-                    ['Time Commitment', p.timeCommitment],
-                    ['Biggest Barrier', p.biggestBarrier],
-                    ['Immediate Application', p.immediateApplication],
-                    ['AI Tools Used', Array.isArray(p.aiToolsUsed) ? p.aiToolsUsed.join(', ') : (p.aiToolsUsed || '')]
-                ].map(([k,v]) => `
-                    <div class="profile-item">
-                        <div class="profile-key">${k}</div>
-                        <div class="profile-value">${v || '-'}</div>
+                    ['Learning Style', p.learningStyle]
+                ].filter(([k,v]) => v).map(([k,v]) => `
+                    <div class="profile-row">
+                        <span class="profile-label">${k}:</span>
+                        <span class="profile-value">${escapeHtml(String(v))}</span>
                     </div>
                 `).join('')}
             </div>
         </div>
     `;
 
-    // Chapter views (one at a time)
+    // All chapters in a single document (print-friendly)
     const chaptersHTML = course.chapters.map((chapter, index) => `
-        <div class="chapter-view" id="view-${index}" style="display:${index===0?'block':'none'}">
-            <div class="chapter-head">
-                <div class="badge">Chapter ${chapter.number}</div>
-                <h1>${chapter.title}</h1>
-                <p class="objective">${chapter.learningObjective}</p>
+        <div class="chapter-section" id="chapter-${chapter.number}">
+            <div class="chapter-header">
+                <div class="chapter-number">Chapter ${chapter.number}</div>
+                <h1 class="chapter-title">${escapeHtml(chapter.title)}</h1>
+                <p class="chapter-objective">${escapeHtml(chapter.learningObjective || '')}</p>
             </div>
             ${chapter.introduction ? `
-                <div class="section">
-                    <h3>Introduction</h3>
-                    <div>${formatText(chapter.introduction)}</div>
+                <div class="content-section">
+                    <h2 class="section-title">Introduction</h2>
+                    <div class="section-content">${formatText(escapeHtml(chapter.introduction))}</div>
                 </div>
             ` : ''}
             ${chapter.coreConcepts && chapter.coreConcepts.length ? `
-                <div class="section">
-                    <h3>Core Concepts</h3>
+                <div class="content-section">
+                    <h2 class="section-title">Core Concepts</h2>
                     ${chapter.coreConcepts.map(c => `
-                        <div class="concept">
-                            <h4>${c.concept}</h4>
-                            <p>${c.explanation}</p>
-                            <p><strong>Example:</strong> ${c.example}</p>
+                        <div class="concept-box">
+                            <h3 class="concept-title">${escapeHtml(c.concept)}</h3>
+                            <p class="concept-text">${formatText(escapeHtml(c.explanation))}</p>
+                            ${c.example ? `<div class="concept-example"><strong>Example:</strong> ${formatText(escapeHtml(c.example))}</div>` : ''}
                         </div>
                     `).join('')}
                 </div>
             ` : ''}
             ${chapter.promptingExamples && chapter.promptingExamples.length ? `
-                <div class="section">
-                    <h3>Prompting Examples</h3>
+                <div class="content-section">
+                    <h2 class="section-title">Prompting Examples</h2>
                     ${chapter.promptingExamples.map(p => `
-                        <div class="prompt-example">
-                            <h4>${p.title}</h4>
-                            <p>${p.explanation}</p>
-                            <pre class="code">${escapeHtml(p.prompt)}</pre>
-                            <p><strong>Expected Output:</strong> ${p.expectedOutput}</p>
+                        <div class="example-box">
+                            <h3 class="example-title">${escapeHtml(p.title)}</h3>
+                            <p class="example-description">${formatText(escapeHtml(p.explanation || ''))}</p>
+                            <div class="code-block">
+                                <pre><code>${escapeHtml(p.prompt || '')}</code></pre>
+                            </div>
+                            ${p.expectedOutput ? `<div class="expected-output"><strong>Expected Output:</strong> ${formatText(escapeHtml(p.expectedOutput))}</div>` : ''}
+                            ${p.customizationTips ? `<div class="customization-tips"><strong>Customization Tips:</strong> ${formatText(escapeHtml(p.customizationTips))}</div>` : ''}
                         </div>
                     `).join('')}
                 </div>
             ` : ''}
             ${chapter.agentPromptExamples && chapter.agentPromptExamples.length ? `
-                <div class="section">
-                    <h3>Agent Prompt Examples</h3>
+                <div class="content-section">
+                    <h2 class="section-title">AI Agent Examples</h2>
                     ${chapter.agentPromptExamples.map(a => `
-                        <div class="agent">
-                            <h4>${a.title}</h4>
-                            <div class="agent-row"><span class="k">Scenario</span><span class="v">${a.scenario || '-'}</span></div>
-                            <div class="agent-row"><span class="k">Agent Role</span><span class="v">${a.agentRole || '-'}</span></div>
-                            <div class="agent-row"><span class="k">Instructions</span></div>
-                            <pre class="code">${escapeHtml(a.agentInstructions || '')}</pre>
-                            <div class="agent-row"><span class="k">Expected Behavior</span><span class="v">${a.expectedBehavior || '-'}</span></div>
-                            ${a.useCase ? `<div class="agent-row"><span class="k">Use Case</span><span class="v">${a.useCase}</span></div>` : ''}
+                        <div class="agent-box">
+                            <h3 class="agent-title">${escapeHtml(a.title)}</h3>
+                            ${a.scenario ? `<div class="info-row"><span class="info-label">Scenario:</span><span class="info-value">${escapeHtml(a.scenario)}</span></div>` : ''}
+                            ${a.agentRole ? `<div class="info-row"><span class="info-label">Agent Role:</span><span class="info-value">${escapeHtml(a.agentRole)}</span></div>` : ''}
+                            ${a.agentInstructions ? `
+                                <div class="code-block">
+                                    <pre><code>${escapeHtml(a.agentInstructions)}</code></pre>
+                                </div>
+                            ` : ''}
+                            ${a.expectedBehavior ? `<div class="info-row"><span class="info-label">Expected Behavior:</span><span class="info-value">${formatText(escapeHtml(a.expectedBehavior))}</span></div>` : ''}
+                            ${a.useCase ? `<div class="info-row"><span class="info-label">Use Case:</span><span class="info-value">${escapeHtml(a.useCase)}</span></div>` : ''}
                         </div>
                     `).join('')}
                 </div>
             ` : ''}
             ${chapter.tryItYourself && chapter.tryItYourself.length ? `
-                <div class="section">
-                    <h3>Try It Yourself</h3>
+                <div class="content-section">
+                    <h2 class="section-title">Hands-On Exercises</h2>
                     ${chapter.tryItYourself.map(t => `
-                        <div class="exercise">
-                            <div class="exercise-head">
-                                <h4>${t.title}</h4>
-                                <span class="badge ${t.difficulty || 'beginner'}">${t.difficulty || ''}</span>
+                        <div class="exercise-box">
+                            <div class="exercise-header">
+                                <h3 class="exercise-title">${escapeHtml(t.title)}</h3>
+                                ${t.difficulty ? `<span class="difficulty-badge ${t.difficulty}">${t.difficulty}</span>` : ''}
                             </div>
-                            <p>${t.instructions || ''}</p>
-                            <p><strong>Expected Outcome:</strong> ${t.expectedOutcome || ''}</p>
+                            ${t.instructions ? `<p class="exercise-instructions">${formatText(escapeHtml(t.instructions))}</p>` : ''}
+                            ${t.expectedOutcome ? `<div class="exercise-outcome"><strong>Expected Outcome:</strong> ${formatText(escapeHtml(t.expectedOutcome))}</div>` : ''}
                         </div>
                     `).join('')}
                 </div>
             ` : ''}
+            ${chapter.keyTakeaways && chapter.keyTakeaways.length ? `
+                <div class="content-section">
+                    <h2 class="section-title">Key Takeaways</h2>
+                    <ul class="takeaways-list">
+                        ${chapter.keyTakeaways.map(t => `<li>${escapeHtml(t)}</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
             ${chapter.aiMindsetReflection ? `
-                <div class="section">
-                    <h3>AI Mindset Reflection</h3>
-                    <div class="reflection">
-                        <div class="reflection-row"><span class="k">Question</span><span class="v">${chapter.aiMindsetReflection.question || '-'}</span></div>
-                        <div class="reflection-row"><span class="k">Confidence Tip</span><span class="v">${chapter.aiMindsetReflection.confidenceTip || '-'}</span></div>
-                        ${chapter.aiMindsetReflection.ethicalConsideration ? `<div class="reflection-row"><span class="k">Ethical Consideration</span><span class="v">${chapter.aiMindsetReflection.ethicalConsideration}</span></div>` : ''}
+                <div class="content-section reflection-section">
+                    <h2 class="section-title">AI Mindset Reflection</h2>
+                    <div class="reflection-box">
+                        ${chapter.aiMindsetReflection.question ? `<div class="reflection-item"><strong>Question:</strong> ${escapeHtml(chapter.aiMindsetReflection.question)}</div>` : ''}
+                        ${chapter.aiMindsetReflection.confidenceTip ? `<div class="reflection-item"><strong>Confidence Tip:</strong> ${escapeHtml(chapter.aiMindsetReflection.confidenceTip)}</div>` : ''}
+                        ${chapter.aiMindsetReflection.ethicalConsideration ? `<div class="reflection-item"><strong>Ethical Consideration:</strong> ${escapeHtml(chapter.aiMindsetReflection.ethicalConsideration)}</div>` : ''}
                     </div>
                 </div>
             ` : ''}
             ${chapter.latestUpdates && chapter.latestUpdates.length ? `
-                <div class="section">
-                    <h3>Latest Insights & Updates</h3>
-                    <div class="updates">
+                <div class="content-section">
+                    <h2 class="section-title">Latest Insights & Updates</h2>
+                    <div class="updates-list">
                         ${chapter.latestUpdates.map(u => `
-                            <div class="update">
-                                <div class="u-title">${u.title}</div>
-                                <div class="u-summary">${u.summary}</div>
+                            <div class="update-item">
+                                <h4 class="update-title">${escapeHtml(u.title || 'Update')}</h4>
+                                ${u.summary ? `<p class="update-summary">${formatText(escapeHtml(u.summary))}</p>` : ''}
                             </div>
                         `).join('')}
                     </div>
                 </div>
             ` : ''}
-            ${chapter.keyTakeaways && chapter.keyTakeaways.length ? `
-                <div class="section">
-                    <h3>Key Takeaways</h3>
-                    <ul>${chapter.keyTakeaways.map(t => `<li>${t}</li>`).join('')}</ul>
-                </div>
-            ` : ''}
-            <div class="pager">
-                <button onclick="prevChapter()" ${index===0?'disabled':''}>Previous</button>
-                <button onclick="nextChapter()" ${index===course.chapters.length-1?'disabled':''}>Next</button>
-            </div>
+            ${index < course.chapters.length - 1 ? '<div class="page-break"></div>' : ''}
         </div>
     `).join('');
+
+    const generatedDate = new Date(course.generatedAt || Date.now()).toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
 
     return `
 <!DOCTYPE html>
@@ -578,99 +586,392 @@ function generateExportHTML() {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${course.title}</title>
+    <title>${escapeHtml(course.title)}</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Montserrat',sans-serif;line-height:1.6;color:#E5E7EB;background:#0F172A}
-        .layout{display:grid;grid-template-columns:300px 1fr;gap:24px;max-width:1200px;margin:0 auto;padding:24px}
-        .sidebar{position:sticky;top:24px;align-self:start;background:#111827;border:1px solid #1F2937;border-radius:12px;padding:16px}
-        .title{font-size:24px;font-weight:800;background:linear-gradient(135deg,#60A5FA,#F472B6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
-        .subtitle{color:#9CA3AF;margin-bottom:16px}
-        .tabs{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-        .tab{padding:8px 12px;border-radius:999px;border:1px solid #1F2937;background:#0B1220;color:#CBD5E1;font-weight:600;cursor:pointer}
-        .tab.active{background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(236,72,153,.15));border-color:#334155;color:#93C5FD}
-        .nav{display:flex;flex-direction:column;gap:6px}
-        .nav-link{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:8px;color:#E5E7EB;text-decoration:none;border:1px solid #0B1220;background:#0B1220}
-        .nav-link:hover{background:#0B1528;border-color:#1F2937}
-        .nav-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#1F2937;font-size:12px;font-weight:700}
-        .nav-title{flex:1}
-        .content{background:#0B1220;border:1px solid #1F2937;border-radius:12px;padding:20px;min-height:60vh}
-        .chapter-head .badge{display:inline-block;padding:4px 10px;border-radius:999px;background:linear-gradient(135deg,#60A5FA,#F472B6);color:#0B1220;font-weight:800;margin-bottom:8px}
-        .chapter-head h1{font-size:26px;margin-bottom:6px;color:#E5E7EB}
-        .objective{color:#94A3B8;margin-bottom:14px}
-        .section{margin:20px 0}
-        pre.code{background:#0A0F1A;color:#E5E7EB;padding:12px;border-radius:8px;overflow-x:auto;white-space:pre-wrap;word-break:break-word;border:1px solid #1F2937}
-        .concept,.prompt-example,.agent,.exercise,.update,.panel,.reflection{background:#0F172A;padding:12px;border-radius:8px;margin:10px 0;border:1px solid #1F2937}
-        .agent-row,.reflection-row{display:flex;gap:12px;margin:6px 0}
-        .k{min-width:160px;color:#93C5FD;font-weight:700}
-        .v{color:#E5E7EB}
-        .updates{display:grid;gap:10px}
-        .u-title{font-weight:700;color:#EAB308}
-        .pager{display:flex;justify-content:space-between;gap:8px;margin-top:12px}
-        .pager button{padding:8px 12px;border-radius:8px;border:1px solid #1F2937;background:#0B1528;color:#E5E7EB;cursor:pointer;font-weight:600}
-        .pager button[disabled]{opacity:.5;cursor:not-allowed}
-        .panel{border-style:dashed}
-        .profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px}
-        .profile-item{background:#0B1528;border:1px solid #1F2937;border-radius:8px;padding:10px}
-        .profile-key{font-weight:700;font-size:12px;color:#93C5FD;margin-bottom:4px}
-        .profile-value{color:#E5E7EB}
-        .badge.beginner{background:#064E3B;color:#A7F3D0;border:1px solid #065F46}
-        .badge.intermediate{background:#78350F;color:#FDE68A;border:1px solid #92400E}
-        .badge.advanced{background:#7F1D1D;color:#FCA5A5;border:1px solid #991B1B}
-        @media (max-width: 900px){.layout{grid-template-columns:1fr}.sidebar{position:static}}
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        @media print {
+            .page-break { page-break-before: always; }
+            body { background: white; }
+        }
+        
+        body {
+            font-family: 'Montserrat', sans-serif;
+            line-height: 1.7;
+            color: #1a1a1a;
+            background: #ffffff;
+            font-size: 14px;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .document-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 50px;
+            background: white;
+        }
+        
+        .cover-page {
+            text-align: center;
+            padding: 80px 0 100px;
+            border-bottom: 3px solid #1a1a1a;
+            margin-bottom: 60px;
+        }
+        
+        .cover-title {
+            font-size: 42px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 16px;
+            letter-spacing: -0.5px;
+        }
+        
+        .cover-subtitle {
+            font-size: 20px;
+            font-weight: 400;
+            color: #4a4a4a;
+            margin-bottom: 40px;
+        }
+        
+        .cover-meta {
+            font-size: 14px;
+            color: #6a6a6a;
+            margin-top: 60px;
+        }
+        
+        .toc-section {
+            margin: 60px 0;
+            padding: 40px 0;
+            border-top: 1px solid #e0e0e0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .toc-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 30px;
+        }
+        
+        .toc-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .toc-number {
+            font-weight: 700;
+            color: #1a1a1a;
+            min-width: 40px;
+            font-size: 14px;
+        }
+        
+        .toc-title-text {
+            color: #4a4a4a;
+            flex: 1;
+        }
+        
+        .profile-summary {
+            background: #f8f9fa;
+            padding: 30px;
+            border-left: 4px solid #1a1a1a;
+            margin: 40px 0;
+        }
+        
+        .profile-summary h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 20px;
+        }
+        
+        .profile-row {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        
+        .profile-label {
+            font-weight: 600;
+            color: #1a1a1a;
+            min-width: 180px;
+        }
+        
+        .profile-value {
+            color: #4a4a4a;
+        }
+        
+        .chapter-section {
+            margin: 80px 0;
+        }
+        
+        .chapter-header {
+            border-bottom: 2px solid #1a1a1a;
+            padding-bottom: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .chapter-number {
+            font-size: 12px;
+            font-weight: 700;
+            color: #6a6a6a;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+        
+        .chapter-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 12px;
+            line-height: 1.3;
+        }
+        
+        .chapter-objective {
+            font-size: 16px;
+            color: #4a4a4a;
+            font-weight: 400;
+            line-height: 1.6;
+        }
+        
+        .content-section {
+            margin: 50px 0;
+        }
+        
+        .section-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 24px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .section-content {
+            color: #4a4a4a;
+            line-height: 1.8;
+        }
+        
+        .section-content p {
+            margin-bottom: 16px;
+        }
+        
+        .concept-box, .example-box, .agent-box, .exercise-box {
+            background: #f8f9fa;
+            padding: 24px;
+            margin: 24px 0;
+            border-left: 3px solid #1a1a1a;
+        }
+        
+        .concept-title, .example-title, .agent-title, .exercise-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 12px;
+        }
+        
+        .concept-text, .example-description {
+            color: #4a4a4a;
+            line-height: 1.8;
+            margin-bottom: 12px;
+        }
+        
+        .concept-example {
+            background: white;
+            padding: 12px;
+            border-left: 2px solid #6a6a6a;
+            margin-top: 12px;
+            font-size: 13px;
+            color: #4a4a4a;
+        }
+        
+        .code-block {
+            background: #1a1a1a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        
+        .code-block pre {
+            margin: 0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #e0e0e0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        
+        .code-block code {
+            color: #e0e0e0;
+        }
+        
+        .expected-output, .customization-tips {
+            background: white;
+            padding: 16px;
+            margin-top: 16px;
+            border-left: 2px solid #4a4a4a;
+            font-size: 14px;
+            color: #4a4a4a;
+        }
+        
+        .info-row {
+            display: flex;
+            margin: 12px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #1a1a1a;
+            min-width: 140px;
+        }
+        
+        .info-value {
+            color: #4a4a4a;
+            flex: 1;
+        }
+        
+        .exercise-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .difficulty-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .difficulty-badge.beginner {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .difficulty-badge.intermediate {
+            background: #fff3e0;
+            color: #e65100;
+        }
+        
+        .difficulty-badge.advanced {
+            background: #fce4ec;
+            color: #c2185b;
+        }
+        
+        .exercise-instructions {
+            color: #4a4a4a;
+            line-height: 1.8;
+            margin-bottom: 12px;
+        }
+        
+        .exercise-outcome {
+            background: white;
+            padding: 12px;
+            border-left: 2px solid #4a4a4a;
+            font-size: 14px;
+            color: #4a4a4a;
+        }
+        
+        .takeaways-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .takeaways-list li {
+            padding: 12px 0 12px 24px;
+            position: relative;
+            color: #4a4a4a;
+            line-height: 1.8;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .takeaways-list li:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #1a1a1a;
+            font-weight: 700;
+        }
+        
+        .reflection-section {
+            background: #f8f9fa;
+            padding: 30px;
+            border-left: 4px solid #1a1a1a;
+        }
+        
+        .reflection-box {
+            margin-top: 20px;
+        }
+        
+        .reflection-item {
+            margin: 16px 0;
+            color: #4a4a4a;
+            line-height: 1.8;
+        }
+        
+        .reflection-item strong {
+            color: #1a1a1a;
+        }
+        
+        .updates-list {
+            margin-top: 20px;
+        }
+        
+        .update-item {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 16px 0;
+            border-left: 3px solid #6a6a6a;
+        }
+        
+        .update-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+        
+        .update-summary {
+            color: #4a4a4a;
+            line-height: 1.8;
+        }
+        
+        .page-break {
+            page-break-before: always;
+            margin: 60px 0;
+        }
     </style>
 </head>
 <body>
-    <div class="layout">
-        <aside class="sidebar">
-            <div class="title">${course.title}</div>
-            <div class="subtitle">${course.subtitle}</div>
-            <div class="tabs">
-                <button class="tab active" id="tab-chapters" onclick="switchView('chapters')">Chapters</button>
-                <button class="tab" id="tab-profile" onclick="switchView('profile')">Learner Profile</button>
+    <div class="document-container">
+        <div class="cover-page">
+            <h1 class="cover-title">${escapeHtml(course.title)}</h1>
+            <p class="cover-subtitle">${escapeHtml(course.subtitle || '')}</p>
+            <div class="cover-meta">
+                <p>Generated: ${generatedDate}</p>
+                ${course.estimatedTotalTime ? `<p>Estimated Time: ${course.estimatedTotalTime} minutes</p>` : ''}
             </div>
-            <nav class="nav" id="nav-chapters">
-                ${sidebarLinks}
-            </nav>
-        </aside>
-        <main class="content">
-            <div id="profile-view" style="display:none">
-                ${profileHTML}
-            </div>
-            <div id="chapters-view">
-                ${chaptersHTML}
-            </div>
-        </main>
+        </div>
+        
+        ${profileSummary}
+        
+        <div class="toc-section">
+            <h2 class="toc-title">Table of Contents</h2>
+            ${tocHTML}
+        </div>
+        
+        ${chaptersHTML}
     </div>
-    <script>
-        let currentIndex = 0;
-        function showChapter(i){
-            currentIndex = i;
-            document.querySelectorAll('.chapter-view').forEach((el,idx)=>{
-                el.style.display = idx===i ? 'block' : 'none';
-            });
-            document.querySelectorAll('.nav-link').forEach((a,idx)=>{
-                a.style.background = idx===i ? 'rgba(139,92,246,0.08)' : '';
-                a.style.borderColor = idx===i ? '#C7D2FE' : 'transparent';
-            });
-        }
-        function nextChapter(){
-            const total = ${course.chapters.length};
-            if(currentIndex < total-1){ showChapter(currentIndex+1); }
-        }
-        function prevChapter(){
-            if(currentIndex > 0){ showChapter(currentIndex-1); }
-        }
-        function switchView(view){
-            const tabs = {chapters: document.getElementById('tab-chapters'), profile: document.getElementById('tab-profile')};
-            const panes = {chapters: document.getElementById('chapters-view'), profile: document.getElementById('profile-view')};
-            Object.keys(tabs).forEach(k=>tabs[k].classList.remove('active'));
-            Object.keys(panes).forEach(k=>panes[k].style.display='none');
-            tabs[view].classList.add('active');
-            panes[view].style.display = 'block';
-        }
-    </script>
 </body>
 </html>
     `;
@@ -678,12 +979,18 @@ function generateExportHTML() {
 
 // Helper functions
 function formatText(text) {
-    // Convert line breaks to <br> tags
-    return text.replace(/\n/g, '<br>');
+    if (!text) return '';
+    // Convert line breaks to <br> tags and preserve paragraphs
+    return String(text)
+        .replace(/\n\n+/g, '</p><p>')
+        .replace(/\n/g, '<br>')
+        .replace(/^/, '<p>')
+        .replace(/$/, '</p>');
 }
 
 function escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = String(text);
     return div.innerHTML;
 }

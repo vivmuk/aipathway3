@@ -317,6 +317,15 @@ const assessmentQuestions = [
                 description: 'I\'m excited and ready to dive in!'
             }
         ]
+    },
+
+    // Question 9: Job Description (Optional)
+    {
+        id: 'job_description',
+        type: 'textarea',
+        title: 'Job Description (Optional)',
+        description: 'If you\'d like, share your job description or key responsibilities. We\'ll analyze how AI can enhance your specific role and create personalized content tailored to your work.',
+        placeholder: 'Paste your job description, key responsibilities, or describe your role here. This helps us create a more personalized learning journey with specific use cases and AI agents you can build for your role...'
     }
 ];
 
@@ -327,6 +336,11 @@ function getQuestionById(id) {
 
 // Helper function to validate answer
 function isAnswerValid(question, answer) {
+    // Job description is optional, so always return true for it
+    if (question.id === 'job_description') {
+        return true;
+    }
+
     if (!answer) return false;
 
     switch (question.type) {
@@ -334,6 +348,9 @@ function isAnswerValid(question, answer) {
             return answer.length > 0;
         case 'multiple':
             return answer.length > 0;
+        case 'textarea':
+            // For textarea, allow empty (optional questions) or non-empty
+            return true;
         default:
             return false;
     }

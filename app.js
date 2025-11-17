@@ -579,6 +579,7 @@ function generateUserProfile(answers) {
         immediateApplication: 'start using AI effectively', // Default value
         aiMindset: 'exploring', // Default value
         supportNeeds: ['templates', 'examples'], // Default values
+        jobDescription: answers.job_description || null, // Optional job description
         timestamp: new Date().toISOString()
     };
 }

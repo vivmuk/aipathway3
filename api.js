@@ -72,9 +72,16 @@ async function selectBestOutlineModel() {
  */
 async function generateLearningJourney(userProfile, progressCallback) {
     try {
-        // Step 1: Generate course outline (0-20%)
+        // Step 0: Analyze job description if provided (0-5%)
+        let roleAnalysis = null;
+        if (userProfile.jobDescription && userProfile.jobDescription.trim().length > 0) {
+            progressCallback(2, 'Analyzing your role and how AI can enhance it...');
+            roleAnalysis = await analyzeJobDescription(userProfile.jobDescription, userProfile);
+        }
+
+        // Step 1: Generate course outline (5-20%)
         progressCallback(5, 'Analyzing your profile and goals...');
-        const outline = await generateCourseOutline(userProfile);
+        const outline = await generateCourseOutline(userProfile, roleAnalysis);
 
         progressCallback(20, 'Creating your personalized course structure...');
 
@@ -96,25 +103,34 @@ async function generateLearningJourney(userProfile, progressCallback) {
 
             const chapterContent = await generateChapterContent(
                 outline.chapters[i],
-                userProfile
+                userProfile,
+                roleAnalysis
             );
 
             chapters.push(chapterContent);
         }
 
-        // Step 3: Enrich with latest information (80-95%)
-        progressCallback(85, 'Adding latest AI insights and resources...');
+        // Step 2.5: Generate role-specific chapter if job description provided (80-85%)
+        if (roleAnalysis) {
+            progressCallback(80, 'Creating personalized role enhancement chapter...');
+            const roleChapter = await generateRoleEnhancementChapter(userProfile, roleAnalysis);
+            chapters.push(roleChapter);
+        }
 
-        for (let i = 0; i < chapters.length; i++) {
-            const enrichProgress = 85 + (i / totalChapters) * 10;
+        // Step 3: Enrich with latest information (85-95%)
+        progressCallback(85, 'Adding latest AI insights and resources...');
+        const chaptersToEnrich = roleAnalysis ? chapters.slice(0, -1) : chapters; // Don't enrich role chapter
+
+        for (let i = 0; i < chaptersToEnrich.length; i++) {
+            const enrichProgress = 85 + (i / chaptersToEnrich.length) * 10;
             progressCallback(enrichProgress, `Enriching chapter ${i + 1}...`);
 
             const latestInfo = await fetchLatestInformation(
-                chapters[i].title,
+                chaptersToEnrich[i].title,
                 userProfile.industry
             );
 
-            chapters[i].latestUpdates = latestInfo;
+            chaptersToEnrich[i].latestUpdates = latestInfo;
         }
 
         // Step 4: Finalize (95-100%)
@@ -128,7 +144,8 @@ async function generateLearningJourney(userProfile, progressCallback) {
             userProfile: userProfile,
             chapters: chapters,
             generatedAt: new Date().toISOString(),
-            estimatedTotalTime: calculateTotalTime(chapters)
+            estimatedTotalTime: calculateTotalTime(chapters),
+            roleAnalysis: roleAnalysis
         };
 
         progressCallback(100, 'Your learning journey is ready!');
@@ -147,10 +164,131 @@ async function generateLearningJourney(userProfile, progressCallback) {
 }
 
 /**
+ * Analyze job description and extract role insights
+ */
+async function analyzeJobDescription(jobDescription, userProfile) {
+    try {
+        const prompt = `Analyze the following job description and determine how AI can enhance this role. Provide specific insights about:
+1. Key responsibilities that can be automated or enhanced with AI
+2. Specific AI use cases that would be valuable for this role
+3. Types of AI agents that could be built to support this role
+4. How AI will transform this role in the next 1-2 years
+
+Job Description:
+${jobDescription}
+
+Industry: ${userProfile.industry || 'General'}
+Technical Background: ${userProfile.technicalBackground || 'No coding'}
+
+Return a structured analysis in JSON format.`;
+
+        const response = await callVeniceAPI({
+            model: await selectBestOutlineModel(),
+            venice_parameters: {
+                include_venice_system_prompt: false,
+                strip_thinking_response: true,
+                disable_thinking: false
+            },
+            messages: [
+                {
+                    role: 'system',
+                    content: 'You are an expert AI consultant who analyzes job roles and identifies how AI can enhance productivity, automate tasks, and create new capabilities. Provide specific, actionable insights.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            temperature: 0.3,
+            max_completion_tokens: 3000,
+            response_format: {
+                type: 'json_schema',
+                json_schema: {
+                    name: 'role_analysis',
+                    strict: true,
+                    schema: {
+                        type: 'object',
+                        properties: {
+                            roleSummary: { type: 'string' },
+                            keyResponsibilities: {
+                                type: 'array',
+                                items: { type: 'string' }
+                            },
+                            aiEnhancementOpportunities: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        responsibility: { type: 'string' },
+                                        aiSolution: { type: 'string' },
+                                        impact: { type: 'string' }
+                                    },
+                                    required: ['responsibility', 'aiSolution', 'impact'],
+                                    additionalProperties: false
+                                }
+                            },
+                            useCases: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        useCase: { type: 'string' },
+                                        description: { type: 'string' },
+                                        tools: { type: 'array', items: { type: 'string' } }
+                                    },
+                                    required: ['useCase', 'description'],
+                                    additionalProperties: false
+                                }
+                            },
+                            aiAgents: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        agentName: { type: 'string' },
+                                        purpose: { type: 'string' },
+                                        capabilities: { type: 'array', items: { type: 'string' } },
+                                        implementation: { type: 'string' }
+                                    },
+                                    required: ['agentName', 'purpose', 'capabilities'],
+                                    additionalProperties: false
+                                }
+                            },
+                            transformationTimeline: { type: 'string' }
+                        },
+                        required: ['roleSummary', 'keyResponsibilities', 'aiEnhancementOpportunities', 'useCases', 'aiAgents'],
+                        additionalProperties: false
+                    }
+                }
+            }
+        });
+
+        const contentText = response.choices?.[0]?.message?.content ?? '';
+        const parsed = safeParseJSON(contentText);
+        if (parsed) {
+            return parsed;
+        }
+        
+        // Fallback if parsing fails
+        return {
+            roleSummary: 'AI can significantly enhance this role through automation and intelligent assistance.',
+            keyResponsibilities: [],
+            aiEnhancementOpportunities: [],
+            useCases: [],
+            aiAgents: [],
+            transformationTimeline: '1-2 years'
+        };
+    } catch (error) {
+        console.error('Error analyzing job description:', error);
+        return null;
+    }
+}
+
+/**
  * Generate course outline using Venice AI
  */
-async function generateCourseOutline(userProfile) {
-    const prompt = buildOutlinePrompt(userProfile);
+async function generateCourseOutline(userProfile, roleAnalysis = null) {
+    const prompt = buildOutlinePrompt(userProfile, roleAnalysis);
 
     // First attempt: structured response (preferred)
     try {
@@ -255,10 +393,159 @@ async function generateCourseOutline(userProfile) {
 }
 
 /**
+ * Generate role-specific enhancement chapter
+ */
+async function generateRoleEnhancementChapter(userProfile, roleAnalysis) {
+    const prompt = `Create a comprehensive chapter explaining how AI will enhance the learner's specific role.
+
+**Role Analysis:**
+- Role Summary: ${roleAnalysis.roleSummary}
+- Key Responsibilities: ${roleAnalysis.keyResponsibilities.join(', ')}
+- AI Enhancement Opportunities: ${JSON.stringify(roleAnalysis.aiEnhancementOpportunities)}
+- Use Cases: ${JSON.stringify(roleAnalysis.useCases)}
+- AI Agents: ${JSON.stringify(roleAnalysis.aiAgents)}
+- Transformation Timeline: ${roleAnalysis.transformationTimeline || '1-2 years'}
+
+**Learner Context:**
+- Industry: ${userProfile.industry}
+- Technical Background: ${userProfile.technicalBackground}
+- AI Experience: ${userProfile.aiExperience}
+- Learning Style: ${userProfile.learningStyle}
+
+**Chapter Requirements:**
+
+This should be Chapter ${NUM_CHAPTERS + 1} (or the final chapter) titled something like "AI-Enhanced [Role]: Transforming Your Work with AI" or "How AI Will Enhance Your Role: Use Cases and Agents You Can Build"
+
+**Content Structure:**
+
+1. **Introduction** (2-3 paragraphs):
+   - Overview of how AI will transform their specific role
+   - The opportunity to become an AI-enhanced professional
+   - What they'll learn in this chapter
+
+2. **How AI Will Enhance Your Role** (detailed section):
+   - Explain each AI enhancement opportunity from the analysis
+   - Show before/after scenarios for their responsibilities
+   - Quantify the impact (time saved, quality improved, new capabilities)
+   - Address any concerns about job security positively
+
+3. **Specific Use Cases** (detailed for each use case):
+   - For each use case from the analysis:
+     * What it is and why it matters for their role
+     * Step-by-step how to implement it
+     * Tools and platforms needed
+     * Expected outcomes and benefits
+     * Real-world examples
+
+4. **AI Agents You Can Build** (detailed for each agent):
+   - For each agent from the analysis:
+     * Agent name and purpose
+     * What it does and how it works
+     * Step-by-step agent instructions/prompt
+     * Capabilities and limitations
+     * Implementation guide (no-code or low-code options)
+     * Expected behavior and outputs
+
+5. **Getting Started: Your AI Transformation Roadmap**:
+   - Prioritized list of AI enhancements to implement
+   - Timeline for adoption (30 days, 60 days, 90 days)
+   - Quick wins vs. longer-term projects
+   - Resources and tools needed
+
+6. **Try It Yourself** (3-4 exercises):
+   - Build your first role-specific AI agent
+   - Implement a use case from the analysis
+   - Create prompts for your daily tasks
+   - Measure and track improvements
+
+7. **Key Takeaways**:
+   - Summary of how AI enhances their role
+   - Next steps for continued learning
+   - How to stay current with AI developments
+
+8. **AI Mindset Reflection**:
+   - Embracing change and innovation
+   - Building confidence as an AI-enhanced professional
+   - Ethical considerations for AI in their role
+
+Make it:
+- Highly specific to their actual role and responsibilities
+- Actionable with clear implementation steps
+- Encouraging and confidence-building
+- Practical with real examples they can use immediately`;
+
+    const response = await callVeniceAPI({
+        model: await selectBestOutlineModel(),
+        venice_parameters: {
+            include_venice_system_prompt: false,
+            strip_thinking_response: true,
+            disable_thinking: false
+        },
+        messages: [
+            {
+                role: 'system',
+                content: 'You are an expert AI consultant and educator specializing in helping professionals understand how AI can transform their specific roles. You provide actionable, role-specific guidance that empowers learners to become AI-enhanced professionals.'
+            },
+            {
+                role: 'user',
+                content: prompt
+            }
+        ],
+        temperature: 0.3,
+        max_completion_tokens: 15000, // Increased for role chapter
+        response_format: {
+            type: 'json_schema',
+            json_schema: {
+                name: 'role_enhancement_chapter',
+                strict: true,
+                schema: getChapterContentSchema()
+            }
+        }
+    });
+
+    const contentText = response.choices[0].message.content;
+    let content;
+    
+    // Try multiple parsing strategies (same as generateChapterContent)
+    try {
+        content = JSON.parse(contentText);
+    } catch (parseError) {
+        console.warn('Direct JSON parse failed for role chapter, trying safeParseJSON:', parseError.message);
+        content = safeParseJSON(contentText);
+        
+        if (!content) {
+            console.error('Failed to parse role chapter content JSON:', contentText);
+            // Create fallback structure
+            content = {
+                introduction: 'AI can significantly enhance your role through automation and intelligent assistance.',
+                coreConcepts: [],
+                promptingExamples: [],
+                agentPromptExamples: [],
+                tryItYourself: [],
+                keyTakeaways: ['AI will transform your role in the coming years.', 'Start with small implementations and scale up.'],
+                aiMindsetReflection: {
+                    question: 'How will you embrace AI in your role?',
+                    confidenceTip: 'Focus on augmenting your capabilities, not replacing them.'
+                }
+            };
+        }
+    }
+
+    // Create chapter outline structure
+    return {
+        number: NUM_CHAPTERS + 1,
+        title: `How AI Will Enhance Your Role: Use Cases and Agents You Can Build`,
+        learningObjective: `Understand how AI can transform your specific role, identify practical use cases, and learn to build AI agents that enhance your daily work.`,
+        estimatedMinutes: 45,
+        ...content
+    };
+}
+
+/**
  * Generate detailed chapter content
  */
-async function generateChapterContent(chapterOutline, userProfile) {
-    const prompt = buildChapterPrompt(chapterOutline, userProfile);
+async function generateChapterContent(chapterOutline, userProfile, roleAnalysis = null) {
+    const prompt = buildChapterPrompt(chapterOutline, userProfile, roleAnalysis);
 
     const response = await callVeniceAPI({
         model: await selectBestOutlineModel(),
@@ -278,7 +565,7 @@ async function generateChapterContent(chapterOutline, userProfile) {
             }
         ],
         temperature: 0.25,
-        max_completion_tokens: 8000,
+        max_completion_tokens: 12000, // Increased to prevent truncation
         response_format: {
             type: 'json_schema',
             json_schema: {
@@ -291,11 +578,70 @@ async function generateChapterContent(chapterOutline, userProfile) {
 
     const contentText = response.choices[0].message.content;
     let content;
+    
+    // Try multiple parsing strategies
     try {
+        // First, try direct parsing
         content = JSON.parse(contentText);
     } catch (parseError) {
-        console.error('Failed to parse chapter content JSON:', contentText);
-        throw new Error(`Failed to parse chapter content: ${parseError.message}. Response: ${contentText.substring(0, 200)}...`);
+        console.warn('Direct JSON parse failed, trying safeParseJSON:', parseError.message);
+        
+        // Try safeParseJSON which handles code blocks and partial JSON
+        content = safeParseJSON(contentText);
+        
+        if (!content) {
+            // If still failing, try to extract JSON from truncated response
+            console.warn('Safe parse also failed, attempting recovery...');
+            
+            // Try to find and extract a valid JSON object even if truncated
+            const jsonMatch = contentText.match(/\{[\s\S]*/);
+            if (jsonMatch) {
+                try {
+                    // Try to close any unclosed brackets/braces
+                    let jsonStr = jsonMatch[0];
+                    let openBraces = (jsonStr.match(/\{/g) || []).length;
+                    let closeBraces = (jsonStr.match(/\}/g) || []).length;
+                    
+                    // If we're missing closing braces, try to add them
+                    if (openBraces > closeBraces) {
+                        jsonStr += '\n' + '}'.repeat(openBraces - closeBraces);
+                    }
+                    
+                    // Try parsing arrays if object fails
+                    if (jsonStr.includes('"chapters"') || jsonStr.includes('"coreConcepts"')) {
+                        content = JSON.parse(jsonStr);
+                    }
+                } catch (e) {
+                    console.error('Recovery parse failed:', e);
+                }
+            }
+            
+            // If all parsing fails, create a fallback structure
+            if (!content) {
+                console.error('All JSON parsing attempts failed. Creating fallback structure.');
+                console.error('Response length:', contentText.length);
+                console.error('Response preview:', contentText.substring(0, 500));
+                
+                // Create a minimal valid structure to prevent complete failure
+                content = {
+                    introduction: contentText.substring(0, 500) || 'Content generation in progress...',
+                    coreConcepts: [],
+                    promptingExamples: [],
+                    agentPromptExamples: [],
+                    tryItYourself: [],
+                    keyTakeaways: ['Please try regenerating this chapter if content appears incomplete.'],
+                    aiMindsetReflection: {
+                        question: 'How can you apply AI to enhance your work?',
+                        confidenceTip: 'Start with small experiments and build from there.'
+                    }
+                };
+            }
+        }
+    }
+
+    // Validate content structure
+    if (!content || typeof content !== 'object') {
+        throw new Error('Invalid chapter content structure received from API');
     }
 
     return {
@@ -383,46 +729,89 @@ async function fetchLatestInformation(chapterTitle, industry) {
 }
 
 /**
- * Call Venice AI API
+ * Call Venice AI API with retry logic
  */
-async function callVeniceAPI(payload) {
-    const response = await fetch(`${VENICE_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${VENICE_API_KEY}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-        let errorMessage = `Venice API error: ${response.statusText}`;
+async function callVeniceAPI(payload, retries = 2) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-            const error = await response.json();
-            const details = error.details || {};
-            const issues = Array.isArray(error.issues) ? error.issues.map(i => i?.message || JSON.stringify(i)).join(' | ') : '';
-            errorMessage = error.error?.message || error.message || details.message || issues || response.statusText;
-            console.error('API Error Response:', error);
-        } catch (e) {
-            const text = await response.text();
-            console.error('API Error Text:', text);
-            errorMessage = text || response.statusText;
-        }
-        throw new Error(`Venice API error (${response.status}): ${errorMessage}`);
-    }
+            // Create abort controller for timeout (compatible with older browsers)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
+            
+            const response = await fetch(`${VENICE_BASE_URL}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${VENICE_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload),
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
 
-    return await response.json();
+            if (!response.ok) {
+                let errorMessage = `Venice API error: ${response.statusText}`;
+                try {
+                    const error = await response.json();
+                    const details = error.details || {};
+                    const issues = Array.isArray(error.issues) ? error.issues.map(i => i?.message || JSON.stringify(i)).join(' | ') : '';
+                    errorMessage = error.error?.message || error.message || details.message || issues || response.statusText;
+                    console.error('API Error Response:', error);
+                } catch (e) {
+                    const text = await response.text();
+                    console.error('API Error Text:', text);
+                    errorMessage = text || response.statusText;
+                }
+                
+                // Retry on 429 (rate limit) or 500+ errors
+                if ((response.status === 429 || response.status >= 500) && attempt < retries) {
+                    const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff
+                    console.warn(`Retrying after ${waitTime}ms (attempt ${attempt + 1}/${retries + 1})`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                    continue;
+                }
+                
+                throw new Error(`Venice API error (${response.status}): ${errorMessage}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            // Retry on network errors or timeouts
+            if (attempt < retries && (error.name === 'AbortError' || error.name === 'TypeError' || error.message.includes('fetch'))) {
+                const waitTime = Math.pow(2, attempt) * 1000;
+                console.warn(`Network error, retrying after ${waitTime}ms (attempt ${attempt + 1}/${retries + 1}):`, error.message);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                continue;
+            }
+            throw error;
+        }
+    }
 }
 
 /**
  * Build outline generation prompt
  */
-function buildOutlinePrompt(userProfile) {
+function buildOutlinePrompt(userProfile, roleAnalysis = null) {
     const industryContext = userProfile.industry ? `in the ${userProfile.industry} industry` : '';
     const toolsUsed = Array.isArray(userProfile.aiToolsUsed) && userProfile.aiToolsUsed.length > 0
         ? userProfile.aiToolsUsed.join(', ') : 'none yet';
     const supportNeeds = Array.isArray(userProfile.supportNeeds) && userProfile.supportNeeds.length > 0
         ? userProfile.supportNeeds.join(', ') : 'general guidance';
+
+    let roleContext = '';
+    if (roleAnalysis) {
+        roleContext = `
+
+**Role-Specific Context:**
+- Role Summary: ${roleAnalysis.roleSummary || 'AI-enhanced professional role'}
+- Key Responsibilities: ${roleAnalysis.keyResponsibilities?.join(', ') || 'Various professional tasks'}
+- AI Enhancement Opportunities: ${roleAnalysis.aiEnhancementOpportunities?.length || 0} identified areas
+- Use Cases: ${roleAnalysis.useCases?.length || 0} specific AI applications
+- AI Agents: ${roleAnalysis.aiAgents?.length || 0} agents that can be built
+
+IMPORTANT: Use this role analysis to personalize ALL chapters. Reference specific responsibilities, use cases, and agents throughout the course to make it highly relevant to their actual work.`;
+    }
 
     return `Create a personalized ${NUM_CHAPTERS}-chapter Generative AI learning journey ${industryContext}.
 
@@ -438,7 +827,7 @@ function buildOutlinePrompt(userProfile) {
 - AI Tools Used: ${toolsUsed}
 - Specific Challenge: ${userProfile.specificChallenge || 'general productivity'}
 - Immediate Application: ${userProfile.immediateApplication || 'start using AI effectively'}
-- Support Needs: ${supportNeeds}
+- Support Needs: ${supportNeeds}${roleContext}
 
 **Requirements:**
 1. Create exactly ${NUM_CHAPTERS} progressive chapters
@@ -452,7 +841,7 @@ function buildOutlinePrompt(userProfile) {
 9. Match their learning style: ${userProfile.learningStyle || 'mixed'}
 10. Provide the support they need: ${supportNeeds}
 11. Build confidence while addressing their barriers
-12. Emphasize the "AI mindset" of experimentation and iteration
+12. Emphasize the "AI mindset" of experimentation and iteration${roleAnalysis ? '\n13. Personalize examples and exercises to their specific role and responsibilities' : ''}
 
 Generate a course outline with:
 - Engaging course title and subtitle
@@ -463,7 +852,15 @@ Generate a course outline with:
 /**
  * Build chapter content generation prompt
  */
-function buildChapterPrompt(chapterOutline, userProfile) {
+function buildChapterPrompt(chapterOutline, userProfile, roleAnalysis = null) {
+    let roleContext = '';
+    if (roleAnalysis) {
+        roleContext = `
+- Role Summary: ${roleAnalysis.roleSummary || 'Professional role'}
+- Key Responsibilities: ${roleAnalysis.keyResponsibilities?.slice(0, 5).join(', ') || 'Various tasks'}
+- AI Use Cases for This Role: ${roleAnalysis.useCases?.slice(0, 3).map(uc => uc.useCase).join(', ') || 'Multiple applications'}`;
+    }
+
     return `Create detailed, practical content for Chapter ${chapterOutline.number}: ${chapterOutline.title}
 
 **Learning Objective:** ${chapterOutline.learningObjective}
@@ -480,41 +877,41 @@ function buildChapterPrompt(chapterOutline, userProfile) {
 - Immediate Application: ${userProfile.immediateApplication || 'start using AI'}
 - Biggest Barrier: ${userProfile.biggestBarrier || 'getting started'}
 - AI Mindset: ${userProfile.aiMindset || 'exploring'}
-- Support Needs: ${Array.isArray(userProfile.supportNeeds) ? userProfile.supportNeeds.join(', ') : 'general guidance'}
+- Support Needs: ${Array.isArray(userProfile.supportNeeds) ? userProfile.supportNeeds.join(', ') : 'general guidance'}${roleContext}
 
 **Content Requirements:**
 
 1. **Introduction** (2-3 paragraphs):
-   - Why this matters for their goals
-   - Real-world scenario from their industry
-   - What they'll be able to do after this chapter
+   - Why this matters for their goals${roleAnalysis ? ' and their specific role' : ''}
+   - Real-world scenario from their industry${roleAnalysis ? ' or their actual responsibilities' : ''}
+   - What they'll be able to do after this chapter${roleAnalysis ? ' in their role' : ''}
 
 2. **Core Concepts** (3-5 key concepts):
    - Clear, jargon-free explanations
-   - Relevant examples from their industry
+   - Relevant examples from their industry${roleAnalysis ? ' and role-specific applications' : ''}
    - Visual analogies where helpful
 
 3. **Prompting Examples** (3-4 examples):
-   - Specific prompts they can copy and use
+   - Specific prompts they can copy and use${roleAnalysis ? ' - prioritize examples relevant to their role responsibilities' : ''}
    - What each prompt does and why it works
    - Expected output/results
    - Tips for customization
 
 4. **Agent Prompt Examples** (2-3 examples):
-   - More complex agent workflows
+   - More complex agent workflows${roleAnalysis ? ' - include at least one agent example relevant to their role' : ''}
    - Step-by-step agent instructions
    - Expected agent behavior
-   - Use cases and applications
+   - Use cases and applications${roleAnalysis ? ' specific to their work' : ''}
 
 5. **Try It Yourself** (3-4 exercises):
-   - Hands-on activities using free AI tools
+   - Hands-on activities using free AI tools${roleAnalysis ? ' - include exercises that directly relate to their job responsibilities' : ''}
    - Clear instructions and expected outcomes
    - Difficulty level (beginner/intermediate/advanced)
-   - Connection to their immediate goals
+   - Connection to their immediate goals${roleAnalysis ? ' and role' : ''}
 
 6. **Key Takeaways** (4-6 bullet points):
    - Most important concepts to remember
-   - Actionable next steps
+   - Actionable next steps${roleAnalysis ? ' for their specific role' : ''}
    - Common pitfalls to avoid
 
 7. **AI Mindset Reflection**:
@@ -524,10 +921,10 @@ function buildChapterPrompt(chapterOutline, userProfile) {
 
 Make the content:
 - Conversational and encouraging
-- Practical and immediately applicable
-- Specific to their industry when possible
+- Practical and immediately applicable${roleAnalysis ? ' to their actual work' : ''}
+- Specific to their industry${roleAnalysis ? ' and role' : ''} when possible
 - Confidence-building, not intimidating
-- Rich with real examples they can try today`;
+- Rich with real examples they can try today${roleAnalysis ? ' in their role' : ''}`;
 }
 
 /**

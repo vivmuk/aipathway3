@@ -433,12 +433,12 @@ function exportCourse() {
 function generateExportHTML() {
     const course = currentCourse;
 
-    // Table of contents
+    // Table of contents with clickable links
     const tocHTML = course.chapters.map((c, i) => `
-        <div class="toc-item">
+        <a href="#chapter-${c.number}" class="toc-item">
             <span class="toc-number">${c.number}</span>
             <span class="toc-title-text">${escapeHtml(c.title)}</span>
-        </div>
+        </a>
     `).join('');
 
     // Learner profile summary
@@ -570,6 +570,9 @@ function generateExportHTML() {
                     </div>
                 </div>
             ` : ''}
+            <div class="chapter-navigation">
+                <a href="#toc" class="back-to-top-link">↑ Back to Table of Contents</a>
+            </div>
             ${index < course.chapters.length - 1 ? '<div class="page-break"></div>' : ''}
         </div>
     `).join('');
@@ -660,6 +663,17 @@ function generateExportHTML() {
             align-items: flex-start;
             padding: 12px 0;
             border-bottom: 1px solid #f0f0f0;
+            text-decoration: none;
+            color: inherit;
+            transition: background-color 0.2s ease;
+        }
+        
+        .toc-item:hover {
+            background-color: #f8f9fa;
+            padding-left: 8px;
+            padding-right: 8px;
+            margin-left: -8px;
+            margin-right: -8px;
         }
         
         .toc-number {
@@ -672,6 +686,10 @@ function generateExportHTML() {
         .toc-title-text {
             color: #4a4a4a;
             flex: 1;
+        }
+        
+        .toc-item:hover .toc-title-text {
+            color: #1a1a1a;
         }
         
         .profile-summary {
@@ -950,6 +968,67 @@ function generateExportHTML() {
             page-break-before: always;
             margin: 60px 0;
         }
+        
+        .chapter-navigation {
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+        }
+        
+        .back-to-top-link {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #f8f9fa;
+            color: #1a1a1a;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .back-to-top-link:hover {
+            background: #1a1a1a;
+            color: #ffffff;
+            border-color: #1a1a1a;
+        }
+        
+        .floating-home {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background: #1a1a1a;
+            color: #ffffff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            font-size: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .floating-home:hover {
+            background: #4a4a4a;
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+        }
+        
+        @media print {
+            .floating-home {
+                display: none;
+            }
+        }
+        
+        html {
+            scroll-behavior: smooth;
+        }
     </style>
 </head>
 <body>
@@ -965,13 +1044,15 @@ function generateExportHTML() {
         
         ${profileSummary}
         
-        <div class="toc-section">
+        <div class="toc-section" id="toc">
             <h2 class="toc-title">Table of Contents</h2>
             ${tocHTML}
         </div>
         
         ${chaptersHTML}
     </div>
+    
+    <a href="#toc" class="floating-home" title="Back to Table of Contents">⌂</a>
 </body>
 </html>
     `;

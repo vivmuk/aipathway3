@@ -3,8 +3,172 @@
 // Single-page intake form + generation
 // ====================================
 
+// ── Example Use Cases (pre-populated scenarios) ─────────────
+
+const EXAMPLE_USE_CASES = [
+    {
+        id: 'marketing_to_ai_strategist',
+        badge: 'Marketing',
+        title: 'Marketing Manager \u2192 AI Marketing Strategist',
+        desc: 'Transition from traditional marketing to leading AI-powered campaigns and personalization.',
+        data: {
+            current_role: 'Marketing Manager',
+            industry: 'marketing_creative',
+            ai_experience: 'beginner',
+            ai_tools_used: ['chatgpt'],
+            technical_background: 'basic_tech',
+            current_responsibilities: 'I manage a team of 4 marketers. My day-to-day includes planning and executing multi-channel campaigns (email, social, paid ads), managing a $200K quarterly budget, creating content briefs for writers, analyzing campaign performance in Google Analytics and HubSpot, coordinating with the design team, running weekly status meetings, and reporting ROI to leadership. I also handle our brand voice guidelines and approve all public-facing content.',
+            target_job_description: `AI Marketing Strategist
+
+About the Role:
+We're looking for a forward-thinking AI Marketing Strategist to lead the integration of AI tools and methodologies across our marketing organization. You'll develop AI-powered strategies for content creation, audience segmentation, predictive analytics, and campaign optimization.
+
+Responsibilities:
+- Develop and implement AI-driven marketing strategies across all channels
+- Lead adoption of AI tools for content generation, A/B testing, and personalization at scale
+- Build and manage AI-powered customer journey mapping and predictive audience segmentation
+- Create automated content pipelines using LLMs for email, social, and ad copy
+- Design and implement AI agents for marketing workflow automation (brief generation, performance reporting, competitive analysis)
+- Partner with data engineering to build marketing data infrastructure for AI/ML models
+- Establish AI governance guidelines for brand-safe content generation
+- Train marketing team on prompt engineering and AI tool adoption
+- Track and report on AI-driven efficiency gains and performance improvements
+
+Requirements:
+- 5+ years marketing experience with 2+ years using AI/ML in marketing
+- Hands-on experience with LLMs (GPT-4, Claude) for content generation and analysis
+- Proficiency in marketing automation platforms (HubSpot, Marketo, or similar)
+- Experience with AI-powered analytics and predictive modeling
+- Understanding of prompt engineering and AI agent design
+- Strong project management and cross-functional leadership skills
+- Data-driven mindset with ability to translate AI capabilities into business outcomes`,
+            what_excites_you: 'I love the idea of using AI to personalize campaigns at scale and automate the repetitive reporting work that takes up so much of my week.'
+        }
+    },
+    {
+        id: 'analyst_to_ai_data_lead',
+        badge: 'Data & Analytics',
+        title: 'Business Analyst \u2192 AI & Data Analytics Lead',
+        desc: 'Level up from spreadsheets and dashboards to AI-powered insights and automated reporting.',
+        data: {
+            current_role: 'Business Analyst',
+            industry: 'finance',
+            ai_experience: 'regular',
+            ai_tools_used: ['chatgpt', 'copilot', 'perplexity'],
+            technical_background: 'some_coding',
+            current_responsibilities: 'I build weekly and monthly reports in Excel and Power BI for senior leadership. I analyze customer transaction data to identify trends, create financial forecasts, write SQL queries to pull data from our warehouse, build dashboards tracking KPIs, prepare board presentation decks, conduct ad-hoc analysis when teams need answers, and document business requirements for IT projects. I also run quarterly business reviews with department heads.',
+            target_job_description: `AI & Data Analytics Lead
+
+We are seeking an AI & Data Analytics Lead to transform our analytics capabilities using AI and machine learning. You will lead a team that builds intelligent analytics solutions, automates insight generation, and drives data-informed decision-making across the organization.
+
+Key Responsibilities:
+- Lead a team of 3-5 analysts in developing AI-enhanced analytics workflows
+- Design and implement AI-powered automated reporting and anomaly detection systems
+- Build predictive models for customer behavior, churn, and revenue forecasting
+- Create AI agents for natural language data querying (text-to-SQL, conversational BI)
+- Develop self-service AI analytics tools for business users across departments
+- Implement LLM-based solutions for document analysis, summarization, and insight extraction
+- Establish data quality frameworks and AI model monitoring processes
+- Partner with engineering to integrate AI analytics into production systems
+- Present AI-driven insights and recommendations to C-suite and board
+
+Requirements:
+- 5+ years in analytics/BI with progressive leadership responsibility
+- Strong SQL, Python, and data visualization skills
+- Experience with ML/AI frameworks (scikit-learn, TensorFlow, or similar)
+- Hands-on experience with LLMs for data analysis and natural language interfaces
+- Proven ability to translate complex data into executive-level narratives
+- Experience managing and mentoring analysts
+- Financial services or regulated industry experience preferred`,
+            what_excites_you: 'I want to move beyond static dashboards into predictive analytics and build tools that let anyone in the company ask questions of our data in plain English.'
+        }
+    },
+    {
+        id: 'teacher_to_instructional_designer',
+        badge: 'Education',
+        title: 'Teacher \u2192 AI Instructional Designer',
+        desc: 'Leverage classroom expertise to design AI-enhanced learning experiences at scale.',
+        data: {
+            current_role: 'High School Science Teacher',
+            industry: 'education',
+            ai_experience: 'beginner',
+            ai_tools_used: ['chatgpt', 'gemini'],
+            technical_background: 'no_coding',
+            current_responsibilities: 'I teach 5 classes of biology and chemistry to 150+ students. I create lesson plans, develop assessments and rubrics, differentiate instruction for various learning levels, grade assignments and provide feedback, communicate with parents, mentor new teachers, lead the science department curriculum committee, organize lab activities, track student progress in our LMS (Canvas), and attend professional development workshops. I also run an after-school STEM club.',
+            target_job_description: `AI Instructional Designer — EdTech Company
+
+About Us: We're building the next generation of AI-powered learning platforms.
+
+Role Overview:
+Design engaging, adaptive learning experiences powered by AI. You'll work at the intersection of pedagogy and technology to create courses that personalize to each learner.
+
+Responsibilities:
+- Design AI-enhanced curricula that adapt to individual learner needs and pace
+- Create prompt-based learning activities where students interact with AI tutors
+- Develop assessment frameworks that use AI for formative feedback and adaptive testing
+- Build AI agent-powered tutoring workflows for personalized student support
+- Write instructional content optimized for LLM-based delivery and interaction
+- Collaborate with engineers to define AI tutor behavior, guardrails, and pedagogical rules
+- Design rubrics and evaluation criteria for AI-generated educational content
+- Conduct user research with students and educators to improve AI learning tools
+- Stay current with AI in education research and integrate best practices
+
+Requirements:
+- 3+ years classroom teaching experience
+- Understanding of learning science, backward design, and UDL principles
+- Experience with LMS platforms and educational technology tools
+- Familiarity with AI tools (ChatGPT, Claude) and prompt engineering basics
+- Strong writing skills and ability to create clear, engaging content
+- Experience with curriculum design or instructional design preferred
+- Passion for making education more accessible and personalized through technology`,
+            what_excites_you: 'I see so many students who need personalized attention that I can\'t give with 30 kids in a class. AI tutoring could change that completely, and I want to be the one designing those experiences.'
+        }
+    },
+    {
+        id: 'pm_to_ai_product_manager',
+        badge: 'Product',
+        title: 'Project Manager \u2192 AI Product Manager',
+        desc: 'Move from managing timelines to shaping AI-powered products and features.',
+        data: {
+            current_role: 'Senior Project Manager',
+            industry: 'technology',
+            ai_experience: 'regular',
+            ai_tools_used: ['chatgpt', 'claude', 'copilot'],
+            technical_background: 'basic_tech',
+            current_responsibilities: 'I manage 3-4 concurrent software projects with cross-functional teams of 8-15 people. I run sprint planning, daily standups, and retrospectives. I create project timelines in Jira, manage scope and budget, write status reports for stakeholders, facilitate requirements gathering sessions, coordinate releases with engineering and QA, manage vendor relationships, resolve blockers and escalations, and present project updates to the VP of Engineering. I also mentor two junior PMs.',
+            target_job_description: `AI Product Manager
+
+Join our team to lead the product strategy and execution for our AI-powered platform features.
+
+What You'll Do:
+- Define product vision and roadmap for AI/ML-powered features
+- Write detailed PRDs for AI features including model requirements, data needs, and user experience
+- Conduct user research to identify high-impact AI use cases and prioritize the backlog
+- Work closely with ML engineers and data scientists to translate business needs into model requirements
+- Design AI agent architectures for customer-facing automation features
+- Define success metrics and run experiments to measure AI feature impact
+- Manage the full product lifecycle from discovery through launch and iteration
+- Develop AI ethics guidelines and responsible AI practices for product decisions
+- Communicate AI product strategy to executives, customers, and cross-functional partners
+- Stay current with AI/ML trends and competitive landscape
+
+What We're Looking For:
+- 5+ years product management experience, 2+ years with AI/ML products
+- Understanding of ML concepts (training, inference, fine-tuning, RAG, agents)
+- Experience writing product requirements for data-driven and AI features
+- Ability to evaluate AI model performance and make build-vs-buy decisions
+- Strong analytical skills and experience with experimentation/A/B testing
+- Excellent communication skills — can translate technical AI concepts for any audience
+- Experience with agile methodologies and product analytics tools
+- Technical enough to have meaningful conversations with ML engineers`,
+            what_excites_you: 'I\'ve been managing software projects for years but I want to actually shape WHAT gets built, especially AI features. I understand the process side — now I need the AI product knowledge.'
+        }
+    }
+];
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', function () {
+    renderExampleCards();
     renderIntakeForm();
 });
 
@@ -12,6 +176,90 @@ document.addEventListener('DOMContentLoaded', function () {
 function scrollToIntake() {
     const el = document.getElementById('intake-screen');
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Render example use case cards ───────────────────────────
+
+function renderExampleCards() {
+    const grid = document.getElementById('examples-grid');
+    if (!grid) return;
+
+    grid.innerHTML = EXAMPLE_USE_CASES.map(ex => `
+        <div class="example-card" onclick="loadExample('${ex.id}')">
+            <div class="example-badge">${ex.badge}</div>
+            <h4 class="example-title">${ex.title}</h4>
+            <p class="example-desc">${ex.desc}</p>
+            <span class="example-cta">Try this example &rarr;</span>
+        </div>
+    `).join('');
+}
+
+// Pre-populate the form with an example
+function loadExample(exampleId) {
+    const example = EXAMPLE_USE_CASES.find(e => e.id === exampleId);
+    if (!example) return;
+
+    const data = example.data;
+
+    // Fill text inputs
+    setInputValue('current_role', data.current_role);
+    setInputValue('current_responsibilities', data.current_responsibilities);
+    setInputValue('target_job_description', data.target_job_description);
+    setInputValue('what_excites_you', data.what_excites_you || '');
+
+    // Fill select
+    const industrySelect = document.getElementById('industry');
+    if (industrySelect) industrySelect.value = data.industry;
+
+    // Fill radio groups
+    setRadioValue('ai_experience', data.ai_experience);
+    setRadioValue('technical_background', data.technical_background);
+
+    // Fill checkbox group
+    setCheckboxValues('ai_tools_used', data.ai_tools_used);
+
+    // Scroll to the form
+    scrollToIntake();
+
+    // Brief highlight effect
+    document.querySelectorAll('.intake-column').forEach(col => {
+        col.classList.add('highlight-pulse');
+        setTimeout(() => col.classList.remove('highlight-pulse'), 1500);
+    });
+}
+
+function setInputValue(fieldId, value) {
+    const el = document.getElementById(fieldId);
+    if (el) {
+        el.value = value;
+        // Trigger input event for any listeners
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+}
+
+function setRadioValue(fieldId, value) {
+    const group = document.querySelector(`.radio-group[data-field-id="${fieldId}"]`);
+    if (!group) return;
+    // Clear previous selection
+    group.querySelectorAll('.radio-option').forEach(opt => opt.classList.remove('selected'));
+    // Select matching
+    const match = group.querySelector(`.radio-option[data-value="${value}"]`);
+    if (match) {
+        match.classList.add('selected');
+        group.dataset.selectedValue = value;
+    }
+}
+
+function setCheckboxValues(fieldId, values) {
+    const group = document.querySelector(`.checkbox-group[data-field-id="${fieldId}"]`);
+    if (!group) return;
+    // Clear all
+    group.querySelectorAll('.checkbox-option').forEach(opt => opt.classList.remove('selected'));
+    // Select matching
+    (values || []).forEach(val => {
+        const match = group.querySelector(`.checkbox-option[data-value="${val}"]`);
+        if (match) match.classList.add('selected');
+    });
 }
 
 // ── Render the intake form fields ────────────────────────────────

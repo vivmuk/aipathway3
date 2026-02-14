@@ -11,45 +11,13 @@ const VENICE_API_KEY = (typeof window !== 'undefined' && window.VENICE_API_KEY)
     : 'lnWNeSg0pA_rQUooNpbfpPDBaj2vJnWol5WqKWrIEF';
 const VENICE_BASE_URL = 'https://api.venice.ai/api/v1';
 
-// Venice Models
+// Venice Models — explicit assignments
 const MODELS = {
-    CHAPTER_FLOW: 'zai-org-glm-4.6',
-    CHAPTER_CONTENT: 'openai-gpt-oss-120b',
-    SEARCH_SUMMARIZE: 'google-gemma-3-27b-it'
+    GAP_ANALYSIS: 'openai-gpt-52',              // Deep reasoning for gap analysis
+    GENERATION: 'gemini-3-flash-preview',        // Primary for outline + chapters
+    GENERATION_BACKUP: 'grok-41-fast',           // Backup if primary fails
+    SEARCH_SUMMARIZE: 'google-gemma-3-27b-it'    // Web search enrichment
 };
-
-// Auto-select best outline model
-let cachedOutlineModel = null;
-const OUTLINE_MODEL_PREFERENCES = [
-    'qwen3-235b',
-    'llama-3.3-70b',
-    'mistral-31-24b',
-    'venice-uncensored'
-];
-
-async function selectBestOutlineModel() {
-    if (cachedOutlineModel) return cachedOutlineModel;
-    try {
-        const resp = await fetch(`${VENICE_BASE_URL}/models`, {
-            headers: { 'Authorization': `Bearer ${VENICE_API_KEY}` }
-        });
-        if (!resp.ok) return MODELS.CHAPTER_FLOW;
-        const data = await resp.json();
-        const models = Array.isArray(data?.data) ? data.data : [];
-        const structured = models.filter(m => m?.model_spec?.capabilities?.supportsResponseSchema);
-        if (structured.length === 0) { cachedOutlineModel = MODELS.CHAPTER_FLOW; return cachedOutlineModel; }
-        for (const preferred of OUTLINE_MODEL_PREFERENCES) {
-            const found = structured.find(m => m.id === preferred);
-            if (found) { cachedOutlineModel = found.id; return cachedOutlineModel; }
-        }
-        cachedOutlineModel = structured[0].id;
-        return cachedOutlineModel;
-    } catch (e) {
-        console.warn('Model listing failed, using default.', e);
-        cachedOutlineModel = MODELS.CHAPTER_FLOW;
-        return cachedOutlineModel;
-    }
-}
 
 // =====================================================================
 // MAIN GENERATION PIPELINE
@@ -71,40 +39,73 @@ async function generateLearningJourney(userProfile, progressCallback) {
             throw new Error('Failed to generate course outline. Please try again.');
         }
 
-        // Step 2: Generate each chapter (20-80%)
+        // Step 2: Generate chapters IN PARALLEL (20-80%)
         const totalChapters = outline.chapters.length;
-        const chapters = [];
 
-        // Pass chapter titles for tracking
-        progressCallback(20, `Starting chapter generation...`, {
+        // Pass chapter titles for tracking UI
+        progressCallback(20, `Starting chapter generation (parallel)...`, {
             chapterTitles: outline.chapters.map(c => c.title)
         });
 
-        for (let i = 0; i < outline.chapters.length; i++) {
-            const chapterProgress = 20 + (i / totalChapters) * 60;
-            progressCallback(
-                chapterProgress,
-                `Creating Chapter ${i + 1}: ${outline.chapters[i].title}...`,
-                { currentChapter: i, chapterTitle: outline.chapters[i].title }
-            );
+        // Use primary generation model for all chapters
+        const chapterModel = MODELS.GENERATION;
 
-            const chapterContent = await generateChapterContent(
-                outline.chapters[i],
-                userProfile,
-                gapAnalysis
-            );
-            chapters.push(chapterContent);
-        }
+        // Launch all chapter generations concurrently with a concurrency limiter
+        const CHAPTER_CONCURRENCY = 3; // max parallel chapter API calls
+        let completedChapters = 0;
 
-        // Step 3: Enrich with latest information (80-95%)
+        const chapterResults = await runWithConcurrency(
+            outline.chapters.map((chapterOutline, i) => async () => {
+                progressCallback(
+                    20 + (i / totalChapters) * 60,
+                    `Creating Chapter ${i + 1}: ${chapterOutline.title}...`,
+                    { currentChapter: i, chapterTitle: chapterOutline.title }
+                );
+
+                const result = await generateChapterContent(
+                    chapterOutline,
+                    userProfile,
+                    gapAnalysis,
+                    chapterModel
+                );
+
+                completedChapters++;
+                progressCallback(
+                    20 + (completedChapters / totalChapters) * 60,
+                    `Completed ${completedChapters}/${totalChapters} chapters...`,
+                    { currentChapter: i, chapterTitle: chapterOutline.title }
+                );
+
+                return result;
+            }),
+            CHAPTER_CONCURRENCY
+        );
+
+        // Maintain original chapter order
+        const chapters = chapterResults;
+
+        // Step 3: Enrich with latest information IN PARALLEL (80-95%)
         progressCallback(80, 'Adding latest AI insights and resources...', { totalChapters });
 
-        for (let i = 0; i < chapters.length; i++) {
-            const enrichProgress = 80 + (i / chapters.length) * 15;
-            progressCallback(enrichProgress, `Enriching chapter ${i + 1} with latest insights...`);
-            const latestInfo = await fetchLatestInformation(chapters[i].title, userProfile.industry);
-            chapters[i].latestUpdates = latestInfo;
-        }
+        const ENRICH_CONCURRENCY = 5; // enrichment calls are lighter
+        let completedEnrich = 0;
+
+        const enrichResults = await runWithConcurrency(
+            chapters.map((chapter, i) => async () => {
+                const latestInfo = await fetchLatestInformation(chapter.title, userProfile.industry);
+                completedEnrich++;
+                progressCallback(
+                    80 + (completedEnrich / chapters.length) * 15,
+                    `Enriched ${completedEnrich}/${chapters.length} chapters...`
+                );
+                return latestInfo;
+            }),
+            ENRICH_CONCURRENCY
+        );
+
+        enrichResults.forEach((info, i) => {
+            chapters[i].latestUpdates = info;
+        });
 
         // Step 4: Finalize (95-100%)
         progressCallback(95, 'Finalizing your learning journey...');
@@ -184,11 +185,11 @@ Be brutally specific. Reference their ACTUAL responsibilities and the ACTUAL job
 
     try {
         const response = await callVeniceAPI({
-            model: await selectBestOutlineModel(),
+            model: MODELS.GAP_ANALYSIS,
             venice_parameters: {
                 include_venice_system_prompt: false,
-                strip_thinking_response: true,
-                disable_thinking: false
+                strip_thinking_response: true,   // Strip thinking tokens from output
+                disable_thinking: false           // REASONING MODE ON — let it think deeply
             },
             messages: [
                 {
@@ -198,7 +199,7 @@ Be brutally specific. Reference their ACTUAL responsibilities and the ACTUAL job
                 { role: 'user', content: prompt }
             ],
             temperature: 0.3,
-            max_completion_tokens: 5000,
+            max_completion_tokens: 8000,          // More room for reasoning + output
             response_format: {
                 type: 'json_schema',
                 json_schema: {
@@ -303,9 +304,8 @@ async function generateCourseOutline(userProfile, gapAnalysis) {
     const prompt = buildOutlinePrompt(userProfile, gapAnalysis);
 
     try {
-        const outlineModel = await selectBestOutlineModel();
         const response = await callVeniceAPI({
-            model: outlineModel,
+            model: MODELS.GENERATION,
             venice_parameters: {
                 include_venice_system_prompt: false,
                 strip_thinking_response: true,
@@ -368,9 +368,9 @@ async function generateCourseOutline(userProfile, gapAnalysis) {
         }
         throw new Error('Outline schema parsed empty.');
     } catch (e) {
-        console.warn('Structured outline failed; falling back.', e);
+        console.warn(`${MODELS.GENERATION} outline failed; falling back to ${MODELS.GENERATION_BACKUP}.`, e);
         const response2 = await callVeniceAPI({
-            model: await selectBestOutlineModel(),
+            model: MODELS.GENERATION_BACKUP,
             venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
             messages: [
                 { role: 'system', content: 'You output strictly valid JSON with no commentary.' },
@@ -397,11 +397,11 @@ async function generateCourseOutline(userProfile, gapAnalysis) {
 // STEP 2: CHAPTER CONTENT — deeply personalized per gap
 // =====================================================================
 
-async function generateChapterContent(chapterOutline, userProfile, gapAnalysis) {
+async function generateChapterContent(chapterOutline, userProfile, gapAnalysis, modelOverride = null) {
     const prompt = buildChapterPrompt(chapterOutline, userProfile, gapAnalysis);
 
     const response = await callVeniceAPI({
-        model: await selectBestOutlineModel(),
+        model: modelOverride || MODELS.GENERATION,
         venice_parameters: {
             include_venice_system_prompt: false,
             strip_thinking_response: true,
@@ -748,6 +748,32 @@ async function fetchLatestInformation(chapterTitle, industry) {
 // =====================================================================
 // UTILITIES
 // =====================================================================
+
+/**
+ * Run async tasks with a concurrency limit.
+ * @param {Array<() => Promise>} tasks - Array of functions that return promises
+ * @param {number} concurrency - Max number of tasks running at once
+ * @returns {Promise<Array>} Results in original order
+ */
+async function runWithConcurrency(tasks, concurrency) {
+    const results = new Array(tasks.length);
+    let nextIndex = 0;
+
+    async function worker() {
+        while (nextIndex < tasks.length) {
+            const i = nextIndex++;
+            results[i] = await tasks[i]();
+        }
+    }
+
+    const workers = [];
+    for (let w = 0; w < Math.min(concurrency, tasks.length); w++) {
+        workers.push(worker());
+    }
+
+    await Promise.all(workers);
+    return results;
+}
 
 async function callVeniceAPI(payload, retries = 2) {
     for (let attempt = 0; attempt <= retries; attempt++) {

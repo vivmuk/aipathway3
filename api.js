@@ -5,11 +5,8 @@
 
 const NUM_CHAPTERS = 10;
 
-// Get API key from window (injected by server) or use fallback
-const VENICE_API_KEY = (typeof window !== 'undefined' && window.VENICE_API_KEY)
-    ? window.VENICE_API_KEY
-    : '';
-const VENICE_BASE_URL = 'https://api.venice.ai/api/v1';
+// API calls now go through the server-side proxy (key stays secure on server)
+const VENICE_BASE_URL = '/api/venice';
 
 // Venice Models — explicit assignments
 const MODELS = {
@@ -784,7 +781,6 @@ async function callVeniceAPI(payload, retries = 2) {
             const response = await fetch(`${VENICE_BASE_URL}/chat/completions`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${VENICE_API_KEY}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(payload),

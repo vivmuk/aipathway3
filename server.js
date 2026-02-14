@@ -49,6 +49,31 @@ app.get('/course-viewer.html', (req, res) => {
     res.send(html);
 });
 
+// Test endpoint to verify Venice API key server-side
+app.get('/api/test-key', async (req, res) => {
+    if (!VENICE_API_KEY) {
+        return res.json({ ok: false, error: 'VENICE_API_KEY environment variable is not set' });
+    }
+
+    try {
+        const response = await fetch('https://api.venice.ai/api/v1/models', {
+            headers: { 'Authorization': `Bearer ${VENICE_API_KEY}` }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const modelCount = data.data ? data.data.length : 0;
+            res.json({ ok: true, status: response.status, modelCount, keyPreview: `${VENICE_API_KEY.substring(0, 6)}...${VENICE_API_KEY.substring(VENICE_API_KEY.length - 4)}` });
+        } else {
+            let errorBody = '';
+            try { errorBody = await response.text(); } catch (_) {}
+            res.json({ ok: false, status: response.status, statusText: response.statusText, errorBody });
+        }
+    } catch (err) {
+        res.json({ ok: false, error: err.message });
+    }
+});
+
 // Quiet favicon 404s
 app.get('/favicon.ico', (_req, res) => {
     res.status(204).end();

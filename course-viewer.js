@@ -448,11 +448,11 @@ function generateExportHTML() {
             <h3>Learner Profile</h3>
             <div class="profile-details">
                 ${[
-                    ['Primary Goal', p.primaryGoal],
+                    ['Current Role', p.currentRole],
                     ['AI Experience', p.aiExperience],
                     ['Industry', p.industry || 'General'],
                     ['Technical Background', p.technicalBackground],
-                    ['Learning Style', p.learningStyle]
+                    ['AI Tools Used', Array.isArray(p.aiToolsUsed) ? p.aiToolsUsed.join(', ') : p.aiToolsUsed]
                 ].filter(([k,v]) => v).map(([k,v]) => `
                     <div class="profile-row">
                         <span class="profile-label">${k}:</span>

@@ -10,16 +10,9 @@
 
 ## Step 2: Configure the Application
 
-1. Open `api.js` in a text editor
-2. Find line 8 where it says:
-   ```javascript
-   const VENICE_API_KEY = 'lnWNeSg0pA_rQUooNpbfpPDBaj2vJnWol5WqKWrIEF';
-   ```
-3. Replace with your API key:
-   ```javascript
-   const VENICE_API_KEY = 'your_actual_api_key_here';
-   ```
-4. Save the file
+1. Set the `VENICE_API_KEY` environment variable with your Venice API key
+2. When running via the Node server, the key is read from `process.env.VENICE_API_KEY` and injected into the client automatically
+3. Never hardcode API keys in source files
 
 ## Step 3: Choose How to Run
 

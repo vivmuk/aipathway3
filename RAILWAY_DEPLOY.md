@@ -9,7 +9,7 @@ To deploy this application on Railway, you need to set the following environment
 **VENICE_API_KEY**
 - **Description**: Your Venice AI API key
 - **How to get it**: Get your API key from https://venice.ai
-- **Current value** (fallback): `lnWNeSg0pA_rQUooNpbfpPDBaj2vJnWol5WqKWrIEF`
+- **Required**: Set this in your Railway environment variables
 
 ### How to Set Environment Variables in Railway
 

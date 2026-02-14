@@ -8,7 +8,7 @@ const NUM_CHAPTERS = 10;
 // Get API key from window (injected by server) or use fallback
 const VENICE_API_KEY = (typeof window !== 'undefined' && window.VENICE_API_KEY)
     ? window.VENICE_API_KEY
-    : 'lnWNeSg0pA_rQUooNpbfpPDBaj2vJnWol5WqKWrIEF';
+    : '';
 const VENICE_BASE_URL = 'https://api.venice.ai/api/v1';
 
 // Venice Models — explicit assignments

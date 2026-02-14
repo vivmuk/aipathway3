@@ -5,8 +5,13 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Get API key from environment variable or use default
-const VENICE_API_KEY = process.env.VENICE_API_KEY || 'lnWNeSg0pA_rQUooNpbfpPDBaj2vJnWol5WqKWrIEF';
+// Get API key from environment variable (required)
+// Strip wrapping quotes in case the env var was set as VENICE_API_KEY="..."
+const VENICE_API_KEY = (process.env.VENICE_API_KEY || '').replace(/^["']|["']$/g, '');
+
+if (!VENICE_API_KEY) {
+    console.error('WARNING: VENICE_API_KEY environment variable is not set. API calls will fail.');
+}
 
 // Serve static files from the current directory
 app.use(express.static(__dirname));
@@ -53,5 +58,6 @@ app.get('/favicon.ico', (_req, res) => {
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
     console.log(`Open http://localhost:${PORT} in your browser`);
+    console.log(`Venice API key: ${VENICE_API_KEY.substring(0, 6)}...${VENICE_API_KEY.substring(VENICE_API_KEY.length - 4)} (${VENICE_API_KEY.length} chars)`);
 });
 

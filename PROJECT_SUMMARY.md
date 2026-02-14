@@ -750,7 +750,7 @@ You are an expert educator who excels at explaining complex topics in simple, ac
 
 **Base URL:** `https://api.venice.ai/api/v1`
 
-**API Key:** `lnWNeSg0pA_rQUooNpbfpPDBaj2vJnWol5WqKWrIEF`  
+**API Key:** Set via `VENICE_API_KEY` environment variable  
 *(Note: The codebase uses a different key `ntmhtbP2fr_pOQsmuLPuN_nm6lm2INWKiNcvrdEfEC` - use the one from user rules)*
 
 **Authentication:** Bearer token in Authorization header
@@ -897,7 +897,7 @@ const response = await fetch('https://api.venice.ai/api/v1/chat/completions', {
 
 ```bash
 # Venice AI Configuration
-VENICE_API_KEY=lnWNeSg0pA_rQUooNpbfpPDBaj2vJnWol5WqKWrIEF
+VENICE_API_KEY=your_venice_api_key_here
 VENICE_API_URL=https://api.venice.ai/api/v1
 
 # Node Environment
@@ -910,7 +910,7 @@ NEXT_PUBLIC_API_URL=https://aipathway.onrender.com
 ### Local Development (.env.local)
 
 ```bash
-VENICE_API_KEY=lnWNeSg0pA_rQUooNpbfpPDBaj2vJnWol5WqKWrIEF
+VENICE_API_KEY=your_venice_api_key_here
 VENICE_API_URL=https://api.venice.ai/api/v1
 NODE_ENV=development
 ```
@@ -1065,7 +1065,7 @@ export interface Progress {
 npm install
 
 # Create .env.local file
-echo "VENICE_API_KEY=lnWNeSg0pA_rQUooNpbfpPDBaj2vJnWol5WqKWrIEF" > .env.local
+echo "VENICE_API_KEY=your_venice_api_key_here" > .env.local
 echo "VENICE_API_URL=https://api.venice.ai/api/v1" >> .env.local
 echo "NODE_ENV=development" >> .env.local
 
